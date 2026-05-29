@@ -31,7 +31,8 @@ const judge0 = new Judge0Stack(app, "Vertice-Judge0", {
 new AppStack(app, "Vertice-App", {
   env,
   vpc: network.vpc,
-  fargateSg: network.fargateSg,
+  rdsSg: network.rdsSg,
+  judge0Sg: network.judge0Sg,
   dbInstance: data.instance,
   dbSecret: data.secret,
   judge0PrivateIp: judge0.privateIp,

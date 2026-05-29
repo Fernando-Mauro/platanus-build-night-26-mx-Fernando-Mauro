@@ -9,7 +9,8 @@ import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 
 interface AppStackProps extends cdk.StackProps {
   vpc: ec2.IVpc;
-  fargateSg: ec2.ISecurityGroup;
+  rdsSg: ec2.ISecurityGroup;
+  judge0Sg: ec2.ISecurityGroup;
   dbInstance: rds.DatabaseInstance;
   dbSecret: secretsmanager.ISecret;
   judge0PrivateIp: string;
@@ -18,10 +19,14 @@ interface AppStackProps extends cdk.StackProps {
 
 /**
  * T019 — Next.js container on ECS Fargate behind an internet-facing ALB.
- * Tasks run in private subnets with `fargateSg`; the image is built from the
- * repo Dockerfile and pushed to an auto-managed ECR repo at deploy time.
- * All secrets are injected from Secrets Manager (Principle II); the task role is
- * scoped to read only the two app secrets.
+ * Tasks run in private subnets; the image is built from the repo Dockerfile and
+ * pushed to an auto-managed ECR repo at deploy time. All secrets are injected
+ * from Secrets Manager (Principle II); the task role reads only the app secrets.
+ *
+ * The ALB Fargate pattern creates its own service SG (ALB↔task path lives wholly
+ * in this stack). RDS/Judge0 ingress from that SG is declared here as explicit
+ * CfnSecurityGroupIngress on the imported SG ids — a one-way App→Network ref,
+ * which is what avoids the cyclic stack dependency.
  */
 export class AppStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: AppStackProps) {
@@ -52,7 +57,6 @@ export class AppStack extends cdk.Stack {
         memoryLimitMiB: 1024,
         desiredCount: 1,
         publicLoadBalancer: true,
-        securityGroups: [props.fargateSg],
         taskSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
         taskImageOptions: {
           image,
@@ -73,6 +77,28 @@ export class AppStack extends cdk.Stack {
         },
       }
     );
+
+    // The service's own security group (created by the pattern, in THIS stack).
+    const serviceSgId = service.service.connections.securityGroups[0].securityGroupId;
+
+    // Allow the Fargate service to reach RDS + Judge0. Declared here (App stack)
+    // against the imported SG ids → strictly App→Network, no cycle.
+    new ec2.CfnSecurityGroupIngress(this, "RdsFromService", {
+      groupId: props.rdsSg.securityGroupId,
+      sourceSecurityGroupId: serviceSgId,
+      ipProtocol: "tcp",
+      fromPort: 5432,
+      toPort: 5432,
+      description: "Postgres from Fargate service",
+    });
+    new ec2.CfnSecurityGroupIngress(this, "Judge0FromService", {
+      groupId: props.judge0Sg.securityGroupId,
+      sourceSecurityGroupId: serviceSgId,
+      ipProtocol: "tcp",
+      fromPort: 2358,
+      toPort: 2358,
+      description: "Judge0 API from Fargate service",
+    });
 
     // ALB target health: use the static login page (always 200). /api/ping is for
     // the human skeleton check and may report 503 while Judge0 warms up.

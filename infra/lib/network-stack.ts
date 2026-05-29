@@ -5,12 +5,13 @@ import * as ec2 from "aws-cdk-lib/aws-ec2";
 /**
  * T014 — VPC + security groups.
  * Two AZs, public subnets (ALB + NAT) and private-with-egress subnets (Fargate,
- * RDS, Judge0). RDS and Judge0 accept traffic ONLY from the Fargate task SG
- * (Constitution Principle III — strict isolation, no public ingress, no wildcards).
+ * RDS, Judge0). RDS and Judge0 get empty-ingress SGs here; the rule allowing the
+ * Fargate service is declared in the App stack (as CfnSecurityGroupIngress) so
+ * the cross-stack dependency stays one-directional (App→Network) and avoids a
+ * cyclic reference (Constitution Principle III — isolation, no public ingress).
  */
 export class NetworkStack extends cdk.Stack {
   public readonly vpc: ec2.Vpc;
-  public readonly fargateSg: ec2.SecurityGroup;
   public readonly rdsSg: ec2.SecurityGroup;
   public readonly judge0Sg: ec2.SecurityGroup;
 
@@ -26,35 +27,18 @@ export class NetworkStack extends cdk.Stack {
       ],
     });
 
-    // Fargate tasks. Egress open (to reach RDS, Judge0, ECR via NAT).
-    this.fargateSg = new ec2.SecurityGroup(this, "FargateSg", {
-      vpc: this.vpc,
-      description: "ECS Fargate tasks (Next.js app)",
-      allowAllOutbound: true,
-    });
-
-    // RDS: ingress 5432 ONLY from the Fargate task SG.
+    // RDS: ingress 5432 added later from the App stack (Fargate service SG only).
     this.rdsSg = new ec2.SecurityGroup(this, "RdsSg", {
       vpc: this.vpc,
-      description: "RDS PostgreSQL — Fargate only",
+      description: "RDS PostgreSQL — Fargate service only",
       allowAllOutbound: true,
     });
-    this.rdsSg.addIngressRule(
-      this.fargateSg,
-      ec2.Port.tcp(5432),
-      "Postgres from Fargate tasks only"
-    );
 
-    // Judge0 EC2: ingress 2358 ONLY from the Fargate task SG.
+    // Judge0 EC2: ingress 2358 added later from the App stack.
     this.judge0Sg = new ec2.SecurityGroup(this, "Judge0Sg", {
       vpc: this.vpc,
-      description: "Judge0 EC2 — Fargate only",
+      description: "Judge0 EC2 — Fargate service only",
       allowAllOutbound: true,
     });
-    this.judge0Sg.addIngressRule(
-      this.fargateSg,
-      ec2.Port.tcp(2358),
-      "Judge0 API from Fargate tasks only"
-    );
   }
 }
