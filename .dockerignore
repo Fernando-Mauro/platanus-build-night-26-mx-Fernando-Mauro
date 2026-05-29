@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.gitignore
+infra
+specs
+.specify
+.claude
+schema.dbml
+README.md
+CLAUDE.md
+Dockerfile
+.dockerignore
+*.log
+.env
+.env*.local
+coverage

@@ -46,15 +46,15 @@ endpoint that proves live connectivity to a local PostgreSQL and a local Judge0.
 **Goal**: The same walking skeleton runs in AWS — the containerized Next.js app on ECS Fargate
 reaches a private RDS and a private Judge0 EC2, validated by the deployed `/api/ping`.
 
-- [ ] T013 Initialize the AWS CDK (TypeScript) app in `infra/` (`cdk.json`, `bin/app.ts`, `package.json`), assuming `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` are already in the environment (operator deploy creds only).
-- [ ] T014 Implement `infra/lib/network-stack.ts`: VPC (2 AZs, public + private-with-egress subnets, NAT) and security groups (`fargateSg`, `rdsSg` ⟵ 5432 from `fargateSg` only, `judge0Sg` ⟵ 2358 from `fargateSg` only). No `0.0.0.0/0` on RDS/Judge0.
-- [ ] T015 [P] Implement `infra/lib/data-stack.ts`: RDS PostgreSQL (private, encrypted, not public), credentials auto-generated into Secrets Manager (`appDbSecret`).
-- [ ] T016 [P] Implement `infra/lib/judge0-stack.ts`: EC2 t3.medium (Ubuntu 22.04, private subnet, `judge0Sg`), instance role scoped to SSM + read of `judge0Secret`; wire `infra/scripts/judge0-userdata.sh`.
-- [ ] T017 Write `infra/scripts/judge0-userdata.sh`: install Docker + Compose, set cgroup v1 GRUB params (`systemd.unified_cgroup_hierarchy=0 …`), reboot, then download official Judge0, inject `AUTHN_TOKEN`/passwords from Secrets Manager, `docker compose up -d` (per research R2).
-- [ ] T018 Create a production `Dockerfile` for the Next.js app (multi-stage, `output: "standalone"`) and `.dockerignore`.
-- [ ] T019 Implement `infra/lib/app-stack.ts`: ECR repo + **ECS Fargate** service behind an internet-facing ALB, tasks in private subnets with `fargateSg`; task role scoped to read `appDbSecret` + `judge0Secret`; runtime env (`DATABASE_URL`, `JUDGE0_URL`, `JUDGE0_AUTHN_TOKEN`, `AUTH_SECRET`) injected from Secrets Manager.
-- [ ] T020 Build + push the Next.js image to ECR and run `cdk deploy` for all stacks (Network → Data → Judge0 → App).
-- [ ] T021 Run Prisma migrate/health against RDS (one-off task or via the Fargate image) so `/api/ping` can reach the DB.
+- [X] T013 Initialize the AWS CDK (TypeScript) app in `infra/` (`cdk.json`, `bin/app.ts`, `package.json`), assuming `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` are already in the environment (operator deploy creds only).
+- [X] T014 Implement `infra/lib/network-stack.ts`: VPC (2 AZs, public + private-with-egress subnets, NAT) and security groups (`fargateSg`, `rdsSg` ⟵ 5432 from `fargateSg` only, `judge0Sg` ⟵ 2358 from `fargateSg` only). No `0.0.0.0/0` on RDS/Judge0.
+- [X] T015 [P] Implement `infra/lib/data-stack.ts`: RDS PostgreSQL (private, encrypted, not public), credentials auto-generated into Secrets Manager (`appDbSecret`).
+- [X] T016 [P] Implement `infra/lib/judge0-stack.ts`: EC2 t3.medium (Ubuntu 22.04, private subnet, `judge0Sg`), instance role scoped to SSM + read of `judge0Secret`; wire `infra/scripts/judge0-userdata.sh`.
+- [X] T017 Write `infra/scripts/judge0-userdata.sh`: install Docker + Compose, set cgroup v1 GRUB params (`systemd.unified_cgroup_hierarchy=0 …`), reboot, then download official Judge0, inject `AUTHN_TOKEN`/passwords from Secrets Manager, `docker compose up -d` (per research R2).
+- [X] T018 Create a production `Dockerfile` for the Next.js app (multi-stage, `output: "standalone"`) and `.dockerignore`.
+- [X] T019 Implement `infra/lib/app-stack.ts`: ECR repo + **ECS Fargate** service behind an internet-facing ALB, tasks in private subnets with `fargateSg`; task role scoped to read `appDbSecret` + `judge0Secret`; runtime env (`DATABASE_URL`, `JUDGE0_URL`, `JUDGE0_AUTHN_TOKEN`, `AUTH_SECRET`) injected from Secrets Manager.
+- [ ] T020 ⚠️ OPERATOR-RUN (needs AWS creds + Docker, absent in the agent env): `cd infra && cdk bootstrap && pnpm deploy` — builds the image via the Dockerfile asset and deploys all stacks (Network → Data → Judge0 → App). ALB URL is emitted as the `Vertice-App.AlbUrl` output.
+- [ ] T021 ⚠️ OPERATOR-RUN: after deploy, run `prisma migrate deploy` against RDS (one-off ECS task or via a tunnel) so `/api/ping` reports `db: ok`.
 
 **🛑 CHECKPOINT 2 — HUMAN VALIDATION**: Stop here. Human hits the deployed ALB URL `/api/ping` and confirms `db: ok` + `judge0: ok` in AWS (skeleton works in production). Verify SGs have no public ingress on RDS/Judge0.
 

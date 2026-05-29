@@ -1,0 +1,22 @@
+{
+  "name": "vertice-infra",
+  "version": "0.1.0",
+  "private": true,
+  "bin": { "vertice-infra": "bin/app.ts" },
+  "scripts": {
+    "synth": "cdk synth",
+    "deploy": "cdk deploy --all --require-approval never",
+    "destroy": "cdk destroy --all",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "aws-cdk": "^2.176.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.176.0",
+    "constructs": "^10.4.2"
+  }
+}
