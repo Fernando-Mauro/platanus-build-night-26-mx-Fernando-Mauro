@@ -1,0 +1,445 @@
+// =====================================================================
+//  Adaptive Learning Platform — PostgreSQL schema (DBML)
+//  Refined 2026-05-29: Judge0 async-readiness + Bayesian roadmap layer.
+//  See specs/001-adaptive-learning-platform/data-model.md for the ORM
+//  (Prisma) integration and interaction patterns.
+// =====================================================================
+
+  Table users {
+    id integer [primary key]
+    username varchar [unique]
+    email varchar [unique]
+    name varchar
+    display_name varchar(100)
+    birth_date date
+    phone varchar(10)
+    created_at timestamp
+    updated_at timestamp
+  }
+
+  Table student_profiles {
+    id integer [primary key]
+    user_id integer [unique]
+    school varchar(50)
+    education_level enum("PRIMARIA", "SECUNDARIA", "BACHILLERATO")
+    education_year smallint
+    tutor_name varchar
+    tutor_phone varchar
+    city_id integer
+    created_at timestamp
+    updated_at timestamp
+  }
+
+  Table roles {
+    id integer [primary key]
+    name varchar
+    type varchar [unique]
+    description varchar
+  }
+
+  Table role_user {
+    user_id integer
+    role_id integer
+  }
+
+  // ============ PROBLEMS & CONTENT ============
+
+  Table categories {
+    id integer [primary key]
+    name varchar [unique]
+    slug varchar [unique]
+    description varchar
+    created_at timestamp
+    updated_at timestamp
+  }
+
+  Table problems {
+    id integer [primary key]
+    title varchar
+    slug varchar [unique]
+    statement text [note: 'MDX content']
+    difficulty integer [note: '1-10 scale']
+    category_id integer
+    time_limit decimal [note: 'seconds, default 2.0 — per test case (Judge0 cpu_time_limit)']
+    memory_limit integer [note: 'KB, default 262144 (256MB) — Judge0 memory_limit']
+    is_published boolean [default: false]
+    created_at timestamp
+    updated_at timestamp
+  }
+
+  Table tags {
+    id integer [primary key]
+    name varchar [unique]
+    slug varchar [unique]
+    created_at timestamp
+    updated_at timestamp
+  }
+
+  Table problem_tags {
+    problem_id integer
+    tag_id integer
+  }
+
+  Table subtasks {
+    id integer [primary key]
+    problem_id integer
+    "order" integer
+    points integer [note: 'sum per problem = 100']
+    description text
+  }
+
+  Table test_cases {
+    id integer [primary key]
+    subtask_id integer
+    "order" integer
+    input text
+    expected_output text
+    is_sample boolean [default: false, note: 'sample = visible to learner; hidden expected_output never returned by API (FR-005)']
+  }
+
+  // ============ LANGUAGES ============
+
+  Table languages {
+    id integer [primary key]
+    name varchar
+    version varchar
+    judge0_id integer [unique, note: 'Judge0 CE language ID']
+    is_active boolean [default: true]
+    created_at timestamp
+    updated_at timestamp
+  }
+
+  Table problem_languages {
+    id integer [primary key]
+    problem_id integer
+    language_id integer
+  }
+
+  // ============ SUBMISSIONS & JUDGING (Judge0, async-ready) ============
+  // REFINED: an async state machine + Judge0 token correlation + the
+  // evidence fields the Bayesian engine consumes (correctness, time, attempts)
+  // + an idempotency guard so a submission's evidence is applied at most once.
+
+  Table submissions {
+    id integer [primary key]
+    user_id integer
+    problem_id integer
+    language_id integer
+    contest_id integer [note: 'nullable, only if contest submission']
+    code text
+
+    // --- async lifecycle (supports synchronous 30s wait AND completion-after-disconnect, FR-005a/FR-007) ---
+    status enum("pending", "processing", "completed", "error") [default: "pending"]
+    verdict enum("AC", "WA", "TLE", "MLE", "RE", "CE", "IE", "pending") [default: "pending", note: 'overall normalized verdict; CE/IE are submission-level']
+    judge0_batch_token varchar [note: 'nullable; correlation token if submitted as a Judge0 batch']
+
+    // --- scoring & evidence for the Bayesian engine ---
+    total_score integer [note: '0-100 (weighted by subtask points)', default: 0]
+    passed_count integer [default: 0]
+    total_count integer [default: 0]
+    max_time_ms integer [note: 'peak/total cpu time across cases — time evidence']
+    max_memory_kb integer [note: 'peak memory across cases']
+    attempt_number integer [note: 'nth attempt by this user on this problem — attempts evidence']
+
+    // --- timing & idempotency ---
+    queued_at timestamp [note: 'when dispatched to Judge0']
+    judged_at timestamp [note: 'when all verdicts resolved / terminal']
+    evidence_applied_at timestamp [note: 'NULL until the mastery update is applied; guards idempotency (FR-009)']
+    submitted_at timestamp
+    updated_at timestamp
+
+    indexes {
+      (user_id, problem_id)
+      (status) [note: 'lets a poller/worker find unresolved submissions']
+      (user_id, problem_id, attempt_number) [unique]
+    }
+  }
+
+  // One row per (submission, test_case). REFINED: carries the Judge0 token so an
+  // async poll OR a Judge0 callback can locate and update exactly this row.
+  Table verdicts {
+    id integer [primary key]
+    submission_id integer
+    test_case_id integer
+    judge0_token varchar [unique, note: 'Judge0 submission token for this case; key for async poll/callback']
+    status enum("AC", "WA", "TLE", "MLE", "RE", "CE", "pending") [default: "pending"]
+    time_used decimal [note: 'seconds']
+    memory_used integer [note: 'KB']
+    compile_output text [note: 'nullable; populated on CE']
+
+    indexes {
+      (submission_id)
+      (submission_id, test_case_id) [unique]
+    }
+  }
+
+  // ============ KNOWLEDGE GRAPH (Adaptive Roadmap — Bayesian nodes & edges) ============
+  // Two-layer model (spec Clarifications 2026-05-29): TOPICS (roadmap nodes) are
+  // backed by finer-grained CONCEPTS (the Bayesian skill nodes). Problems map to
+  // concepts. Evidence flows concept -> topic; belief propagates DIRECTIONALLY
+  // along prerequisite edges (FR-009a/FR-010). NOTE: `topics` is the adaptive
+  // layer and is distinct from content `categories`/`tags` (topics may be seeded
+  // to mirror categories but drive the roadmap, not just taxonomy).
+
+  Table topics {
+    id integer [primary key]
+    slug varchar [unique]
+    name varchar [note: 'e.g. Arrays, Graphs, Dynamic Programming']
+    description text
+    "order" integer [note: 'default roadmap ordering']
+    created_at timestamp
+    updated_at timestamp
+  }
+
+  Table concepts {
+    id integer [primary key]
+    topic_id integer [note: 'each concept belongs to exactly one topic']
+    slug varchar [unique]
+    name varchar [note: 'e.g. under Graphs: BFS, DFS, adjacency representation']
+    description text
+    // BKT parameters (model-versioned defaults; see model_versions). Bounded (0,1).
+    p_init decimal [note: 'prior P(known) before evidence']
+    p_learn decimal [note: 'P(transition unlearned->learned) per opportunity']
+    p_slip decimal [note: 'P(incorrect | known)']
+    p_guess decimal [note: 'P(correct | not known)']
+    created_at timestamp
+    updated_at timestamp
+  }
+
+  // Directed prerequisite edges. `from` depends on `to` (to is the prerequisite).
+  Table topic_prerequisites {
+    id integer [primary key]
+    from_topic_id integer [note: 'dependent topic']
+    to_topic_id integer [note: 'prerequisite topic']
+    weight decimal [note: '0..1 propagation strength']
+    indexes {
+      (from_topic_id, to_topic_id) [unique]
+    }
+  }
+
+  Table concept_prerequisites {
+    id integer [primary key]
+    from_concept_id integer [note: 'dependent concept']
+    to_concept_id integer [note: 'prerequisite concept (e.g. Graphs depends-on DFS)']
+    weight decimal [note: '0..1 directional propagation strength']
+    indexes {
+      (from_concept_id, to_concept_id) [unique]
+    }
+  }
+
+  // Maps a problem to the concept(s) it exercises; weight = evidence attribution share.
+  Table problem_concepts {
+    id integer [primary key]
+    problem_id integer
+    concept_id integer
+    weight decimal [default: 1, note: '0..1 share of this problem''s evidence assigned to the concept']
+    indexes {
+      (problem_id, concept_id) [unique]
+    }
+  }
+
+  // Versioned parameter set for the whole knowledge model. Exactly one is_active.
+  // Lets the Bayesian model be re-tuned/replaced without destroying learner state.
+  Table model_versions {
+    id integer [primary key]
+    label varchar
+    is_active boolean [default: false]
+    params jsonb [note: 'global thresholds: mastery_threshold, struggle_threshold, hysteresis_margin, propagation_decay, max_propagation_depth']
+    created_at timestamp
+  }
+
+  // ============ BAYESIAN STATE (per-user probabilistic mastery) ============
+
+  // Lower layer — updated DIRECTLY from submission evidence. The live Bayesian state.
+  Table concept_mastery {
+    id integer [primary key]
+    user_id integer
+    concept_id integer
+    model_version_id integer
+    p_mastery decimal [note: '0..1 current P(mastered)']
+    status enum("LOCKED", "AVAILABLE", "RECOMMENDED", "MASTERED") [default: "AVAILABLE"]
+    last_submission_id integer [note: 'nullable; traceability to the evidence that last moved this (FR-009)']
+    opportunities integer [default: 0, note: 'count of evidence applications (BKT bookkeeping)']
+    updated_at timestamp
+    indexes {
+      (user_id, concept_id, model_version_id) [unique]
+      (user_id)
+    }
+  }
+
+  // Upper layer — DERIVED aggregate of the topic's concept_mastery rows.
+  Table topic_mastery {
+    id integer [primary key]
+    user_id integer
+    topic_id integer
+    model_version_id integer
+    p_mastery decimal [note: '0..1 aggregate of concept masteries']
+    status enum("LOCKED", "AVAILABLE", "RECOMMENDED", "MASTERED") [default: "AVAILABLE"]
+    updated_at timestamp
+    indexes {
+      (user_id, topic_id, model_version_id) [unique]
+    }
+  }
+
+  // Append-only audit of every mastery change — full traceability & retrain safety.
+  Table concept_mastery_history {
+    id integer [primary key]
+    user_id integer
+    concept_id integer
+    model_version_id integer
+    submission_id integer [note: 'evidence that caused the change']
+    p_before decimal
+    p_after decimal
+    reason enum("DIRECT_EVIDENCE", "PROPAGATION", "RECOMPUTE") [default: "DIRECT_EVIDENCE"]
+    created_at timestamp
+    indexes {
+      (user_id, concept_id)
+      (submission_id)
+    }
+  }
+
+  // Derived "what to do next" (may be cached or recomputed on read).
+  Table recommendations {
+    id integer [primary key]
+    user_id integer
+    reason enum("PREREQUISITE_GAP", "CONTINUE_TOPIC", "EASIER_PROBLEM", "NEW_TOPIC")
+    next_topic_id integer [note: 'nullable']
+    next_concept_id integer [note: 'nullable']
+    next_problem_id integer [note: 'nullable']
+    explanation varchar
+    computed_at timestamp
+    indexes {
+      (user_id)
+    }
+  }
+
+  // ============ COURSES ============
+
+  Table courses {
+    id integer [primary key]
+    title varchar
+    description text
+    category_id integer
+    start_date date
+    end_date date
+    is_published boolean [default: false]
+    created_at timestamp
+    updated_at timestamp
+  }
+
+  Table course_problems {
+    id integer [primary key]
+    course_id integer
+    problem_id integer
+    "order" integer
+  }
+
+  Table course_admins {
+    id integer [primary key]
+    course_id integer
+    user_id integer
+  }
+
+  Table enrollments {
+    id integer [primary key]
+    user_id integer
+    course_id integer
+    status enum("ACTIVE", "COMPLETED", "DROPPED") [default: "ACTIVE"]
+    enrolled_at timestamp
+    updated_at timestamp
+  }
+
+  // ============ CONTESTS ============
+
+  Table contests {
+    id integer [primary key]
+    title varchar
+    slug varchar [unique]
+    description text
+    start_time timestamp
+    end_time timestamp
+    is_registration_open boolean [default: false]
+    is_published boolean [default: false]
+    created_at timestamp
+    updated_at timestamp
+  }
+
+  Table contest_problems {
+    id integer [primary key]
+    contest_id integer
+    problem_id integer
+    "order" integer
+    label varchar(5) [note: 'A, B, C...']
+  }
+
+  Table contest_registrations {
+    id integer [primary key]
+    contest_id integer
+    user_id integer
+    registered_at timestamp
+  }
+
+  // ============ RELATIONSHIPS ============
+
+  // Users & Profiles
+  Ref: users.id - student_profiles.user_id
+  Ref: roles.id < role_user.role_id
+  Ref: users.id < role_user.user_id
+
+  // Problems & Content
+  Ref: categories.id < problems.category_id
+  Ref: problems.id < problem_tags.problem_id
+  Ref: tags.id < problem_tags.tag_id
+  Ref: problems.id < subtasks.problem_id
+  Ref: subtasks.id < test_cases.subtask_id
+  Ref: problems.id < problem_languages.problem_id
+  Ref: languages.id < problem_languages.language_id
+
+  // Submissions & Judging
+  Ref: users.id < submissions.user_id
+  Ref: problems.id < submissions.problem_id
+  Ref: languages.id < submissions.language_id
+  Ref: submissions.id < verdicts.submission_id
+  Ref: test_cases.id < verdicts.test_case_id
+
+  // Knowledge graph (adaptive roadmap)
+  Ref: topics.id < concepts.topic_id
+  Ref: topics.id < topic_prerequisites.from_topic_id
+  Ref: topics.id < topic_prerequisites.to_topic_id
+  Ref: concepts.id < concept_prerequisites.from_concept_id
+  Ref: concepts.id < concept_prerequisites.to_concept_id
+  Ref: problems.id < problem_concepts.problem_id
+  Ref: concepts.id < problem_concepts.concept_id
+
+  // Bayesian state
+  Ref: users.id < concept_mastery.user_id
+  Ref: concepts.id < concept_mastery.concept_id
+  Ref: model_versions.id < concept_mastery.model_version_id
+  Ref: submissions.id < concept_mastery.last_submission_id
+  Ref: users.id < topic_mastery.user_id
+  Ref: topics.id < topic_mastery.topic_id
+  Ref: model_versions.id < topic_mastery.model_version_id
+  Ref: users.id < concept_mastery_history.user_id
+  Ref: concepts.id < concept_mastery_history.concept_id
+  Ref: submissions.id < concept_mastery_history.submission_id
+  Ref: model_versions.id < concept_mastery_history.model_version_id
+  Ref: users.id < recommendations.user_id
+  Ref: topics.id < recommendations.next_topic_id
+  Ref: concepts.id < recommendations.next_concept_id
+  Ref: problems.id < recommendations.next_problem_id
+
+  // Courses
+  Ref: categories.id < courses.category_id
+  Ref: courses.id < course_problems.course_id
+  Ref: problems.id < course_problems.problem_id
+  Ref: courses.id < course_admins.course_id
+  Ref: users.id < course_admins.user_id
+  Ref: courses.id < enrollments.course_id
+  Ref: users.id < enrollments.user_id
+
+  // Contests
+  Ref: contests.id < contest_problems.contest_id
+  Ref: problems.id < contest_problems.problem_id
+  Ref: contests.id < contest_registrations.contest_id
+  Ref: users.id < contest_registrations.user_id
+  Ref: contests.id < submissions.contest_id
