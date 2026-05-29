@@ -9,6 +9,8 @@ specs
 schema.dbml
 README.md
 CLAUDE.md
+pnpm-workspace.yaml
+docker-compose.dev.yml
 Dockerfile
 .dockerignore
 *.log

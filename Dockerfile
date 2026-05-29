@@ -9,8 +9,13 @@ RUN corepack enable
 # ---- deps ----
 FROM base AS deps
 WORKDIR /app
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc* ./
-RUN pnpm install --frozen-lockfile --prod=false
+COPY package.json pnpm-lock.yaml ./
+# Generate a clean workspace file that APPROVES native build scripts, so
+# `pnpm install` exits 0 (otherwise blocked sharp/prisma postinstall → exit 1).
+# We do NOT copy the repo's pnpm-workspace.yaml (it can carry an invalid
+# `allowBuilds` placeholder added by a local hook).
+RUN printf 'onlyBuiltDependencies:\n  - sharp\n  - "@prisma/client"\n  - "@prisma/engines"\n  - prisma\n  - esbuild\n' > pnpm-workspace.yaml
+RUN pnpm install --no-frozen-lockfile --prod=false
 
 # ---- build ----
 FROM base AS build
@@ -32,6 +37,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
+# Ensure the generated Prisma client + native query engine are present (Next.js
+# standalone file-tracing can miss the engine binary).
+COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=build /app/node_modules/@prisma/client ./node_modules/@prisma/client
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
