@@ -1,0 +1,20 @@
+// Walking-skeleton schema (T004). The full model (data-model.md / schema.dbml)
+// is built in Phase 3 (T022). For now this is enough to prove DB connectivity.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Trivial table so migrations have something to create; the /api/ping endpoint
+/// uses a raw `SELECT 1` and does not depend on this model.
+model HealthCheck {
+  id        Int      @id @default(autoincrement())
+  checkedAt DateTime @default(now())
+
+  @@map("health_check")
+}

@@ -1,0 +1,81 @@
+# Local development stack for the Walking Skeleton (T001).
+# Brings up: app PostgreSQL (5432) + the official Judge0 stack (server on 2358,
+# workers, and Judge0's own postgres + redis). The Next.js app runs on the host
+# (`pnpm dev`) and talks to these via .env.local.
+#
+# NOTE (host requirement, research R2): Judge0's isolate sandbox needs cgroup v1.
+# On a cgroup-v2 host you must enable cgroup v1 (kernel cmdline
+# `systemd.unified_cgroup_hierarchy=0 systemd.legacy_systemd_cgroup_controller=1`)
+# and reboot, or Judge0 workers will error. See quickstart.md.
+
+name: vertice-dev
+
+services:
+  # ---- Application database (used by Next.js / Prisma) ----
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vertice
+      POSTGRES_PASSWORD: vertice
+      POSTGRES_DB: vertice
+    ports:
+      - "5432:5432"
+    volumes:
+      - app_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vertice"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---- Judge0 server ----
+  judge0-server:
+    image: judge0/judge0:1.13.1
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - "2358:2358"
+    environment: &judge0-env
+      REDIS_HOST: judge0-redis
+      REDIS_PORT: "6379"
+      POSTGRES_HOST: judge0-db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: judge0
+      POSTGRES_USER: judge0
+      POSTGRES_PASSWORD: judge0
+      # Local-only token; in AWS this comes from Secrets Manager (never committed).
+      AUTHN_TOKEN: dev-local-judge0-token
+    depends_on:
+      - judge0-db
+      - judge0-redis
+
+  # ---- Judge0 workers (execute submissions in the isolate sandbox) ----
+  judge0-workers:
+    image: judge0/judge0:1.13.1
+    restart: unless-stopped
+    privileged: true
+    command: ["./scripts/workers"]
+    environment: *judge0-env
+    depends_on:
+      - judge0-db
+      - judge0-redis
+
+  judge0-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: judge0
+      POSTGRES_USER: judge0
+      POSTGRES_PASSWORD: judge0
+    volumes:
+      - judge0_db_data:/var/lib/postgresql/data
+
+  judge0-redis:
+    image: redis:7
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "no"]
+
+volumes:
+  app_db_data:
+  judge0_db_data:

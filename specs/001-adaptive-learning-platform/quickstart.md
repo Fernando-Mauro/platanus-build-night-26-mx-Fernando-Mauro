@@ -5,15 +5,32 @@
 - Docker (for local Judge0 + local Postgres)
 - AWS CLI + CDK v2, with `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` exported (deploy only)
 
-## Local development
+## Local development (Walking Skeleton — Phase 1)
 ```bash
 pnpm install
-# Local Postgres + local Judge0 via docker compose (dev only)
-docker compose -f docker-compose.dev.yml up -d
 cp .env.example .env.local        # DATABASE_URL, JUDGE0_URL, JUDGE0_AUTHN_TOKEN, AUTH_SECRET
-pnpm prisma migrate dev           # apply schema (prisma/schema.prisma)
-pnpm db:seed                      # seed topics, concepts, prereq edges, problems, test cases
+# Local Postgres + local Judge0 (server + workers + its own db/redis)
+docker compose -f docker-compose.dev.yml up -d
+pnpm exec prisma generate         # generate Prisma client
 pnpm dev                          # Next.js on http://localhost:3000
+```
+
+**⚠️ Judge0 host requirement (research R2):** Judge0's isolate sandbox needs **cgroup v1**.
+On a cgroup-v2 host (most modern Linux), set the kernel cmdline
+`systemd.unified_cgroup_hierarchy=0 systemd.legacy_systemd_cgroup_controller=1` and reboot,
+otherwise the Judge0 workers error. The app DB + Judge0 *server* still come up either way.
+
+### Skeleton smoke test (Checkpoint 1)
+```bash
+curl -s localhost:3000/api/ping | jq      # expect {"status":"ok","db":"ok","judge0":"ok",...}
+```
+Then open http://localhost:3000 — the header shows a green health dot (`BD ok · Judge0 ok`)
+once both the database and Judge0 are reachable.
+
+### Phase 3 (later, after the schema lands)
+```bash
+pnpm prisma migrate dev           # apply full schema (prisma/schema.prisma)
+pnpm db:seed                      # seed topics, concepts, prereq edges, problems, test cases
 ```
 
 ## Tests

@@ -24,18 +24,18 @@ US3 = Adaptive recommendation (P2) · US4 = Register / sign in (P1).
 **Goal**: A developer can run `pnpm dev`, see the UI at `localhost:3000`, and hit a `/api/ping`
 endpoint that proves live connectivity to a local PostgreSQL and a local Judge0.
 
-- [ ] T001 Create `docker-compose.dev.yml` at repo root bringing up PostgreSQL 16 (port 5432) and the official Judge0 stack (server + worker + its own db/redis, port 2358), with a shared network and named volumes.
-- [ ] T002 [P] Create `.env.example` and `.env.local` (gitignored) with `DATABASE_URL`, `JUDGE0_URL`, `JUDGE0_AUTHN_TOKEN`, `AUTH_SECRET` for local dev (in `lib/config/`).
-- [ ] T003 [P] Add server-only env loader/validator in `lib/config/env.ts` (fails fast if a required var is missing; never exposes secrets to the client).
-- [ ] T004 Initialize Prisma in `prisma/schema.prisma` with the datasource (PostgreSQL) and a minimal `HealthCheck`/no-op model sufficient for a `SELECT 1`; add the singleton client in `lib/db/client.ts` (the only module importing PrismaClient).
-- [ ] T005 [P] Add a minimal Judge0 health client in `features/evaluation/judge0-client.ts` exposing `pingJudge0()` (GET `/about` or `/languages` with `X-Auth-Token`) — the only module that calls Judge0.
-- [ ] T006 Implement `GET /api/ping` in `app/api/ping/route.ts` that runs a DB round-trip via `lib/db` and `pingJudge0()`, returning `{ db: "ok"|err, judge0: "ok"|err, version }` (fails closed, no secret leakage).
+- [X] T001 Create `docker-compose.dev.yml` at repo root bringing up PostgreSQL 16 (port 5432) and the official Judge0 stack (server + worker + its own db/redis, port 2358), with a shared network and named volumes.
+- [X] T002 [P] Create `.env.example` and `.env.local` (gitignored) with `DATABASE_URL`, `JUDGE0_URL`, `JUDGE0_AUTHN_TOKEN`, `AUTH_SECRET` for local dev (in `lib/config/`).
+- [X] T003 [P] Add server-only env loader/validator in `lib/config/env.ts` (fails fast if a required var is missing; never exposes secrets to the client).
+- [X] T004 Initialize Prisma in `prisma/schema.prisma` with the datasource (PostgreSQL) and a minimal `HealthCheck`/no-op model sufficient for a `SELECT 1`; add the singleton client in `lib/db/client.ts` (the only module importing PrismaClient).
+- [X] T005 [P] Add a minimal Judge0 health client in `features/evaluation/judge0-client.ts` exposing `pingJudge0()` (GET `/about` or `/languages` with `X-Auth-Token`) — the only module that calls Judge0.
+- [X] T006 Implement `GET /api/ping` in `app/api/ping/route.ts` that runs a DB round-trip via `lib/db` and `pingJudge0()`, returning `{ db: "ok"|err, judge0: "ok"|err, version }` (fails closed, no secret leakage).
 - [X] T007 [P] [US4] Frontend auth screen implemented in `features/auth/Login.tsx` (design port — done).
 - [X] T008 [P] [US2] Frontend roadmap + dashboard implemented in `features/home/Home.tsx`, `features/roadmap/Roadmap.tsx` (design port — done).
 - [X] T009 [P] [US1] Frontend problems list + workspace implemented in `features/problems/Problems.tsx`, `components/ProblemList.tsx`, `features/workspace/Workspace.tsx` (design port — done).
 - [X] T010 [P] App shell + routing implemented in `app/page.tsx`, `app/layout.tsx`, `lib/icons.tsx`, `lib/data.ts` (design port — done).
-- [ ] T011 Add a tiny health widget or console log in the UI that calls `/api/ping` on load so the skeleton is visibly end-to-end in the browser.
-- [ ] T012 Update `quickstart.md` local section with the `docker-compose.dev.yml` + `/api/ping` smoke steps.
+- [X] T011 Add a tiny health widget or console log in the UI that calls `/api/ping` on load so the skeleton is visibly end-to-end in the browser.
+- [X] T012 Update `quickstart.md` local section with the `docker-compose.dev.yml` + `/api/ping` smoke steps.
 
 **🛑 CHECKPOINT 1 — HUMAN VALIDATION**: Stop here. Human runs `docker compose -f docker-compose.dev.yml up -d` + `pnpm dev`, opens `localhost:3000`, and confirms `/api/ping` returns `db: ok` and `judge0: ok`. Do not proceed to Phase 2 until validated.
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { HealthBadge } from "@/components/HealthBadge";
 import { BrandMark, Login } from "@/features/auth/Login";
 import { Home } from "@/features/home/Home";
 import { Problems } from "@/features/problems/Problems";
@@ -131,7 +132,10 @@ export default function App() {
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-zinc-800 bg-zinc-950/80 px-5 backdrop-blur-md">
         <Logo onClick={() => go("home")} />
         <Nav view={view} go={go} />
-        <UserMenu onLogout={() => { setAuthed(false); setView("home"); }} />
+        <div className="flex items-center gap-3">
+          <HealthBadge />
+          <UserMenu onLogout={() => { setAuthed(false); setView("home"); }} />
+        </div>
       </header>
       <main className="min-h-0 flex-1">
         {view === "home" && <Home onOpen={openProblem} onGo={openProblem} onSeeAll={() => go("problems")} onMap={() => go("map")} />}
