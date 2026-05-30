@@ -48,10 +48,11 @@ async function main() {
       create: t,
       update: { name: t.name, order: t.order, blurb: t.blurb },
     });
-    const comp = await prisma.competency.upsert({
+    const comp: { id: number } = await prisma.competency.upsert({
       where: { slug: t.slug },
       create: { slug: t.slug, name: t.name, topicId: topic.id, prerequisiteId: prevCompId },
       update: { name: t.name, topicId: topic.id, prerequisiteId: prevCompId },
+      select: { id: true },
     });
     compBySlug[t.slug] = comp.id;
     prevCompId = comp.id;
