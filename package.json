@@ -2,6 +2,7 @@
   "name": "vertice",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.5.0",
   "description": "Vértice — adaptive competitive-programming learning platform (frontend)",
   "scripts": {
     "dev": "next dev",

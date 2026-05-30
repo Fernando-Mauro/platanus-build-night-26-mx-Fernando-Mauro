@@ -9,6 +9,9 @@ RUN corepack enable
 # ---- deps ----
 FROM base AS deps
 WORKDIR /app
+# Disable frozen-lockfile robustly (pnpm honors this env var even when the CLI
+# flag is overridden by CI auto-detection inside the Docker build).
+ENV npm_config_frozen_lockfile=false
 COPY package.json pnpm-lock.yaml ./
 # Generate a clean workspace file that APPROVES native build scripts, so
 # `pnpm install` exits 0 (otherwise blocked sharp/prisma postinstall → exit 1).
@@ -22,8 +25,10 @@ FROM base AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN pnpm exec prisma generate
-RUN pnpm exec next build
+# Call the binaries directly (pnpm exec can't resolve them without the workspace
+# file, which is intentionally absent in this stage).
+RUN node_modules/.bin/prisma generate
+RUN node_modules/.bin/next build
 
 # ---- runtime ----
 FROM node:22-bookworm-slim AS runner
