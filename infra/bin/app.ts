@@ -15,14 +15,10 @@ const env: cdk.Environment = {
   region: process.env.CDK_DEFAULT_REGION,
 };
 
-// ALB base URL for Cognito OAuth callback/logout. Passed as a plain string (context
-// or env) so AuthStack does NOT depend on AppStack — avoids a Cognito↔App cycle.
-// After the first App deploy, set ALB_URL to the real ALB URL and redeploy Auth.
-const albUrl = app.node.tryGetContext("albUrl") || process.env.ALB_URL;
-
 const network = new NetworkStack(app, "Vertice-Network", { env });
 
-const auth = new AuthStack(app, "Vertice-Auth", { env, appBaseUrl: albUrl });
+// Credentials-flow Cognito: no OAuth callback URL needed (works over HTTP).
+const auth = new AuthStack(app, "Vertice-Auth", { env });
 
 const data = new DataStack(app, "Vertice-Data", {
   env,
@@ -48,7 +44,6 @@ new AppStack(app, "Vertice-App", {
   cognitoIssuer: auth.issuerUrl,
   cognitoUserPoolId: auth.userPool.userPoolId,
   cognitoClientId: auth.userPoolClient.userPoolClientId,
-  cognitoClientSecret: auth.clientSecret,
 });
 
 app.synth();

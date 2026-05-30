@@ -2,28 +2,27 @@ import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as iam from "aws-cdk-lib/aws-iam";
-import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
-
-interface AuthStackProps extends cdk.StackProps {
-  /** ALB base URL (http://...) for OAuth callback/logout URLs. */
-  appBaseUrl?: string;
-}
 
 /**
- * T005 — Amazon Cognito for real user auth.
- * User Pool (email sign-in + verification) + confidential App Client (secret used
- * server-side by Auth.js) + Identity Pool federating the pool. Client secret is
- * exposed as a stack output reference; AppStack reads it into the Fargate task.
+ * T005 — Amazon Cognito for real user auth (Credentials-flow variant).
+ *
+ * The web app authenticates with Cognito via the AWS SDK (USER_PASSWORD_AUTH /
+ * SignUp / ConfirmSignUp) from Auth.js's Credentials provider — NOT the OAuth
+ * authorization-code redirect. That avoids Cognito's hard requirement that OAuth
+ * callback URLs use HTTPS (our ALB is HTTP), which previously caused the App
+ * Client creation to fail and roll back the whole stack.
+ *
+ * Resources: User Pool (email sign-in + verification) + a PUBLIC App Client
+ * (no secret, USER_PASSWORD_AUTH enabled — server-side credential flow) + an
+ * Identity Pool federating the pool (per the requirement).
  */
 export class AuthStack extends cdk.Stack {
   public readonly userPool: cognito.UserPool;
   public readonly userPoolClient: cognito.UserPoolClient;
   public readonly identityPool: cognito.CfnIdentityPool;
   public readonly issuerUrl: string;
-  /** Cognito app-client secret, stored in Secrets Manager for the Fargate task. */
-  public readonly clientSecret: secretsmanager.ISecret;
 
-  constructor(scope: Construct, id: string, props: AuthStackProps = {}) {
+  constructor(scope: Construct, id: string, props: cdk.StackProps = {}) {
     super(scope, id, props);
 
     // ---- User Pool ----
@@ -47,24 +46,14 @@ export class AuthStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY, // hackathon; revisit for prod
     });
 
-    // ---- App Client (confidential — has a secret, used by Auth.js server-side) ----
-    const callbackBase = props.appBaseUrl ?? "http://localhost:3000";
+    // ---- App Client (PUBLIC — no secret; USER_PASSWORD_AUTH for server-side
+    // credential flow). No oAuth block → no HTTPS callback requirement. ----
     this.userPoolClient = this.userPool.addClient("WebClient", {
       userPoolClientName: "Vertice-WebClient",
-      generateSecret: true,
-      authFlows: { userPassword: true, userSrp: true },
-      oAuth: {
-        flows: { authorizationCodeGrant: true },
-        scopes: [
-          cognito.OAuthScope.OPENID,
-          cognito.OAuthScope.EMAIL,
-          cognito.OAuthScope.PROFILE,
-        ],
-        callbackUrls: [
-          `${callbackBase}/api/auth/callback/cognito`,
-          "http://localhost:3000/api/auth/callback/cognito",
-        ],
-        logoutUrls: [callbackBase, "http://localhost:3000"],
+      generateSecret: false,
+      authFlows: {
+        userPassword: true,
+        userSrp: true,
       },
     });
 
@@ -94,12 +83,6 @@ export class AuthStack extends cdk.Stack {
     new cognito.CfnIdentityPoolRoleAttachment(this, "IdentityPoolRoles", {
       identityPoolId: this.identityPool.ref,
       roles: { authenticated: authedRole.roleArn },
-    });
-
-    // Store the confidential client secret in Secrets Manager (Principle II) so
-    // the Fargate task can read it without it ever touching the repo/bundle.
-    this.clientSecret = new secretsmanager.Secret(this, "CognitoClientSecret", {
-      secretStringValue: this.userPoolClient.userPoolClientSecret,
     });
 
     this.issuerUrl = `https://cognito-idp.${this.region}.amazonaws.com/${this.userPool.userPoolId}`;

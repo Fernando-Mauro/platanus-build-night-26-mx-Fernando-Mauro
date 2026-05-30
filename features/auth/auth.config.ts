@@ -1,35 +1,54 @@
-// Auth.js (NextAuth v5) configuration with the Cognito provider (T010).
-// Server-side JWT cookie session. On sign-in, JIT-sync the user into RDS and
-// attach the internal user id to the token/session. (contracts/auth.md)
+// Auth.js (NextAuth v5) — Credentials provider backed by Cognito (T010).
+// We call Cognito's USER_PASSWORD_AUTH directly (no OAuth redirect), so this
+// works over plain HTTP (our ALB) and on localhost. On sign-in we JIT-sync the
+// user into RDS and stash the internal id on the session. (contracts/auth.md)
 import NextAuth from "next-auth";
-import Cognito from "next-auth/providers/cognito";
+import Credentials from "next-auth/providers/credentials";
+import { cognitoSignIn, decodeIdToken } from "./cognito";
 import { jitSync } from "./jit-sync";
 
-// Read directly from process.env (not the throwing validator) so `next build`
-// route collection doesn't fail when Cognito env is absent at build time. At
-// runtime on Fargate these are injected from the Auth stack / Secrets Manager.
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
-    Cognito({
-      clientId: process.env.COGNITO_CLIENT_ID,
-      clientSecret: process.env.COGNITO_CLIENT_SECRET,
-      issuer: process.env.COGNITO_ISSUER,
+    Credentials({
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(creds) {
+        const email = creds?.email as string | undefined;
+        const password = creds?.password as string | undefined;
+        if (!email || !password) return null;
+
+        const result = await cognitoSignIn(email, password);
+        if (!result) return null;
+
+        const claims = decodeIdToken(result.idToken);
+        if (!claims.sub) return null;
+
+        // Return the identity; the jwt callback handles RDS sync.
+        return {
+          id: claims.sub,
+          email: claims.email ?? email,
+          name: claims.name ?? null,
+        };
+      },
     }),
   ],
   session: { strategy: "jwt" },
+  pages: { signIn: "/" },
   callbacks: {
-    // On first sign-in, upsert the RDS user row and stash the internal id.
-    async jwt({ token, profile }) {
-      if (profile && token.sub) {
+    async jwt({ token, user }) {
+      // `user` is set only on initial sign-in (from authorize()).
+      if (user?.id) {
+        token.cognitoSub = user.id;
         try {
-          const user = await jitSync({
-            cognitoId: token.sub,
-            email: (profile.email as string) ?? (token.email as string) ?? "",
-            name: (profile.name as string) ?? null,
+          const synced = await jitSync({
+            cognitoId: user.id,
+            email: user.email ?? "",
+            name: user.name ?? null,
           });
-          token.internalUserId = user.id;
+          token.internalUserId = synced.id;
         } catch (err) {
-          // Do not block login on a transient DB hiccup; next login self-heals.
           console.error("jitSync failed:", err);
         }
       }
@@ -37,10 +56,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async session({ session, token }) {
       if (session.user) {
-        // Attach our extra fields via a loose cast (no Session augmentation).
         const u = session.user as unknown as Record<string, unknown>;
         u.internalId = (token as { internalUserId?: number }).internalUserId;
-        u.cognitoId = token.sub;
+        u.cognitoId = (token as { cognitoSub?: string }).cognitoSub;
       }
       return session;
     },

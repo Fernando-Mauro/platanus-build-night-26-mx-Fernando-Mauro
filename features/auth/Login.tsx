@@ -1,23 +1,76 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import {
   IconArrowRight,
   IconEye,
   IconEyeOff,
-  IconGithub,
   IconLock2,
   IconMail,
   IconSparkles,
   type IconComponent,
 } from "@/lib/icons";
 
-export function BrandMark({ size = 36 }: { size?: number }) {
+// Vértice brand mark: a tesseract (hypercube) — an outer cube face enclosing an
+// inner cube, joined by the 4D struts. Drawn with the sky brand gradient + glow.
+// Pure SVG so it scales cleanly everywhere (header, login, favicon).
+export function BrandMark({ size = 36, title = "Vértice" }: { size?: number; title?: string }) {
+  const uid = useId();
+  const grad = `vtx-grad-${uid}`;
+  const glow = `vtx-glow-${uid}`;
   return (
-    <span className="relative flex items-center justify-center" style={{ height: size, width: size }}>
-      <span className="absolute inset-0 rotate-45 rounded-[10px] bg-gradient-to-br from-sky-400 to-sky-600 shadow-lg shadow-sky-500/30" />
-      <span className="absolute inset-[7px] rotate-45 rounded-[5px] border border-sky-200/40" />
-    </span>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 100 100"
+      fill="none"
+      role="img"
+      aria-label={title}
+    >
+      <defs>
+        <linearGradient id={grad} x1="6" y1="6" x2="94" y2="94" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#7dd3fc" />
+          <stop offset="55%" stopColor="#38bdf8" />
+          <stop offset="100%" stopColor="#0284c7" />
+        </linearGradient>
+        <filter id={glow} x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur stdDeviation="2.1" result="b" />
+          <feMerge>
+            <feMergeNode in="b" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+      <g
+        stroke={`url(#${grad})`}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        filter={`url(#${glow})`}
+      >
+        {/* 4D struts joining outer and inner cube corners */}
+        <g strokeWidth="3.6" opacity="0.5">
+          <line x1="16" y1="16" x2="39" y2="39" />
+          <line x1="84" y1="16" x2="61" y2="39" />
+          <line x1="84" y1="84" x2="61" y2="61" />
+          <line x1="16" y1="84" x2="39" y2="61" />
+        </g>
+        {/* outer cube face */}
+        <rect x="16" y="16" width="68" height="68" rx="6" strokeWidth="5.5" />
+        {/* inner cube face */}
+        <rect
+          x="39"
+          y="39"
+          width="22"
+          height="22"
+          rx="3"
+          strokeWidth="4.5"
+          fill="#38bdf8"
+          fillOpacity="0.18"
+        />
+      </g>
+      {/* center vertex highlight */}
+      <circle cx="50" cy="50" r="2.4" fill="#e0f2fe" />
+    </svg>
   );
 }
 
@@ -83,16 +136,75 @@ function Field({
   );
 }
 
-export function Login({ onAuth }: { onAuth: () => void }) {
-  const [email, setEmail] = useState("andrea.reyes@vertice.dev");
-  const [pass, setPass] = useState("••••••••••");
+type Mode = "signin" | "signup" | "confirm";
+
+export function Login({ onSignedIn }: { onSignedIn: () => void }) {
+  const [mode, setMode] = useState<Mode>("signin");
+  const [email, setEmail] = useState("");
+  const [pass, setPass] = useState("");
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
 
-  const submit = (e: React.FormEvent) => {
+  // Real sign-in via the Auth.js Credentials provider (Cognito USER_PASSWORD_AUTH).
+  const doSignIn = async () => {
+    const { signIn } = await import("next-auth/react");
+    const res = await signIn("credentials", { email, password: pass, redirect: false });
+    if (res?.error) {
+      setError("Correo o contraseña incorrectos, o la cuenta no está verificada.");
+    } else {
+      onSignedIn();
+    }
+  };
+
+  // Register: create the Cognito user, then switch to the confirm-code step.
+  const doSignUp = async () => {
+    const r = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password: pass, name }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      setError(data.error ?? "No se pudo crear la cuenta.");
+    } else {
+      setInfo("Te enviamos un código de verificación a tu correo.");
+      setMode("confirm");
+    }
+  };
+
+  // Confirm the emailed code, then sign in automatically.
+  const doConfirm = async () => {
+    const r = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, code }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      setError(data.error ?? "Código inválido.");
+    } else {
+      await doSignIn();
+    }
+  };
+
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+    setInfo(null);
     setLoading(true);
-    setTimeout(() => onAuth(), 850);
+    try {
+      if (mode === "signin") await doSignIn();
+      else if (mode === "signup") await doSignUp();
+      else await doConfirm();
+    } catch {
+      setError("Ocurrió un error. Intenta de nuevo.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

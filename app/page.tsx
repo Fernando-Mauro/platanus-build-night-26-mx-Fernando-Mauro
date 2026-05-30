@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { signIn, signOut, useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { HealthBadge } from "@/components/HealthBadge";
 import { BrandMark, Login } from "@/features/auth/Login";
 import { Home } from "@/features/home/Home";
@@ -126,10 +126,11 @@ export default function App() {
   const go = (v: View) => setView(v);
   const openProblem = () => setView("workspace");
 
-  // Real auth (feature 002): unauthenticated → show Login, which triggers the
-  // Cognito sign-in (hosted UI) via Auth.js. Registration is the Cognito sign-up.
+  // Real auth (feature 002): unauthenticated → show Login. Login handles the
+  // Cognito credentials sign-in/registration itself; on success it refreshes
+  // the session so this component re-renders authenticated.
   if (status !== "authenticated") {
-    return <Login onAuth={() => signIn("cognito", { callbackUrl: "/" })} />;
+    return <Login onSignedIn={() => window.location.reload()} />;
   }
 
   return (
