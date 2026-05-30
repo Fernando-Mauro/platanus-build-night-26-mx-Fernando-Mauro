@@ -44,14 +44,13 @@ ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 
-# Next.js standalone server + static assets + public dir
+# Next.js standalone server + static assets. The standalone bundle already
+# includes the traced node_modules (incl. the generated Prisma client + engine),
+# so we copy it wholesale and avoid brittle per-path COPYs.
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
+# `public/` may be empty but must exist for Next's static serving.
 COPY --from=build /app/public ./public
-# Ensure the generated Prisma client + native query engine are present (Next.js
-# standalone file-tracing can miss the engine binary).
-COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=build /app/node_modules/@prisma/client ./node_modules/@prisma/client
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
