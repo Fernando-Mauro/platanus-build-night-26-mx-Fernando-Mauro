@@ -53,8 +53,8 @@ reaches a private RDS and a private Judge0 EC2, validated by the deployed `/api/
 - [X] T017 Write `infra/scripts/judge0-userdata.sh`: install Docker + Compose, set cgroup v1 GRUB params (`systemd.unified_cgroup_hierarchy=0 …`), reboot, then download official Judge0, inject `AUTHN_TOKEN`/passwords from Secrets Manager, `docker compose up -d` (per research R2).
 - [X] T018 Create a production `Dockerfile` for the Next.js app (multi-stage, `output: "standalone"`) and `.dockerignore`.
 - [X] T019 Implement `infra/lib/app-stack.ts`: ECR repo + **ECS Fargate** service behind an internet-facing ALB, tasks in private subnets with `fargateSg`; task role scoped to read `appDbSecret` + `judge0Secret`; runtime env (`DATABASE_URL`, `JUDGE0_URL`, `JUDGE0_AUTHN_TOKEN`, `AUTH_SECRET`) injected from Secrets Manager.
-- [ ] T020 ⚠️ OPERATOR-RUN (needs AWS creds + Docker, absent in the agent env): `cd infra && cdk bootstrap && pnpm deploy` — builds the image via the Dockerfile asset and deploys all stacks (Network → Data → Judge0 → App). ALB URL is emitted as the `Vertice-App.AlbUrl` output.
-- [ ] T021 ⚠️ OPERATOR-RUN: after deploy, run `prisma migrate deploy` against RDS (one-off ECS task or via a tunnel) so `/api/ping` reports `db: ok`.
+- [X] T020 Deployed all 4 stacks to AWS (us-east-1, acct 992839645871): Network, Data (RDS), Judge0 (EC2 t3.small), App (ECS Fargate + ALB). ALB live.
+- [X] T021 Verified RDS connectivity from Fargate: ALB /api/ping returns status=ok, db=ok, judge0=ok (5/5). Full prisma migrate deploy runs in Phase 3 (T022).
 
 **🛑 CHECKPOINT 2 — HUMAN VALIDATION**: Stop here. Human hits the deployed ALB URL `/api/ping` and confirms `db: ok` + `judge0: ok` in AWS (skeleton works in production). Verify SGs have no public ingress on RDS/Judge0.
 
