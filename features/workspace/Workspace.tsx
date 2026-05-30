@@ -8,6 +8,7 @@ import {
   type ProblemDetail,
   type SubmissionResponse,
 } from "@/lib/api/vertice";
+import { CodeEditor } from "@/components/CodeEditor";
 import { LANGS } from "@/lib/data";
 import {
   IconArrowLeft,
@@ -282,13 +283,9 @@ export function Workspace({
               </button>
             </div>
           </div>
-          <textarea
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            spellCheck={false}
-            placeholder="Escribe tu solución aquí…"
-            className="min-h-0 flex-1 resize-none bg-[#0b0b0d] p-4 font-mono text-[13px] leading-relaxed text-zinc-200 outline-none placeholder:text-zinc-600"
-          />
+          <div className="min-h-0 flex-1">
+            <CodeEditor value={code} onChange={setCode} lang={lang} />
+          </div>
         </div>
         <ConsolePane state={state} result={result} />
       </section>

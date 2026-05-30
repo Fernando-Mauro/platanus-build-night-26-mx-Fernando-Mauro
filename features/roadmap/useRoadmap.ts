@@ -6,14 +6,14 @@ import { useCallback, useEffect, useState } from "react";
 import { fetchRoadmap, type RoadmapResponse, type RoadmapStatus } from "@/lib/api/vertice";
 import type { TopicStatus } from "@/lib/data";
 
-// Fixed visual layout for the 5 seeded competencies (single centered chain).
-// Keyed by competency slug; the engine drives everything else.
+// Graph node positions (center coords on an 800x520 canvas). A zig-zag chain so
+// the prerequisite edges read as a real graph rather than a straight list.
 const LAYOUT: Record<string, { left: number; top: number; icon: string }> = {
-  arreglos:  { left: 385, top: 16,  icon: "IconBrackets" },
-  hashing:   { left: 385, top: 148, icon: "IconHash" },
-  recursion: { left: 385, top: 280, icon: "IconLayers" },
-  arboles:   { left: 385, top: 412, icon: "IconArrows" },
-  grafos:    { left: 385, top: 544, icon: "IconGit" },
+  arreglos:  { left: 130, top: 90,  icon: "IconBrackets" },
+  hashing:   { left: 360, top: 180, icon: "IconHash" },
+  recursion: { left: 600, top: 110, icon: "IconLayers" },
+  arboles:   { left: 470, top: 360, icon: "IconArrows" },
+  grafos:    { left: 200, top: 410, icon: "IconGit" },
 };
 const FALLBACK = { left: 385, top: 16, icon: "IconBrackets" };
 

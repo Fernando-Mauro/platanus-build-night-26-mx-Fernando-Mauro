@@ -3,7 +3,7 @@
 // update exactly once, and returns the verdict + mastery delta + gating so the
 // roadmap can react. (contracts/mastery-api.md)
 import { NextResponse } from "next/server";
-import { auth } from "@/features/auth/auth.config";
+import { getCurrentUserId } from "@/features/auth/session";
 import { evaluate, type TestCase } from "@/features/evaluation/evaluate";
 import { computeMasteryUpdate, isRealVerdict, type Verdict } from "@/features/knowledge/update";
 import { getActiveTuning, getProblemForSubmission, getRoadmap } from "@/lib/db/knowledge";
@@ -16,8 +16,7 @@ export const maxDuration = 60;
 const LANG_IDS: Record<string, number> = { cpp: 54, python: 71, javascript: 63 };
 
 export async function POST(req: Request) {
-  const session = await auth();
-  const userId = (session?.user as { internalId?: number } | undefined)?.internalId;
+  const userId = await getCurrentUserId();
   if (!userId) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
   let body: { problemId?: number; sourceCode?: string; lang?: string; languageId?: number };
@@ -38,8 +37,14 @@ export async function POST(req: Request) {
     body.languageId ?? (body.lang ? LANG_IDS[body.lang] : undefined) ?? data.problem.languageId;
   const testCases = (data.problem.testCases as unknown as TestCase[]) ?? [];
 
-  // 1. Run on Judge0 (fails closed → ERROR, which moves no mastery).
-  const result = await evaluate({ sourceCode, languageId, testCases });
+  // 1. Evaluate. Default backend is Judge0; the "reference" demo backend
+  //    string-matches against the stored reference solution.
+  const result = await evaluate({
+    sourceCode,
+    languageId,
+    testCases,
+    referenceSolution: data.problem.referenceSolution,
+  });
 
   // 2. Persist the submission.
   const submission = await createSubmission({

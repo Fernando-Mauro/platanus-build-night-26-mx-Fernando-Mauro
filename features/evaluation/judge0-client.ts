@@ -1,13 +1,8 @@
-// Judge0 client (T005) — the ONLY module permitted to talk to Judge0
-// (Constitution Principle III). Phase 3 (T026) extends this with batch submit
-// + result polling; for the walking skeleton it only exposes a health ping.
+// Judge0 client — the ONLY module (besides evaluate.ts) permitted to talk to
+// Judge0 (Constitution Principle III). Works against self-hosted Judge0 or
+// Judge0 CE on RapidAPI (header set chosen in lib/config/env).
 import "server-only";
-import { getServerEnv } from "@/lib/config/env";
-
-function authHeaders(): HeadersInit {
-  const { JUDGE0_AUTHN_TOKEN } = getServerEnv();
-  return { "X-Auth-Token": JUDGE0_AUTHN_TOKEN };
-}
+import { getServerEnv, judge0Headers } from "@/lib/config/env";
 
 export type Judge0Health = { ok: boolean; version?: string; error?: string };
 
@@ -15,10 +10,10 @@ export type Judge0Health = { ok: boolean; version?: string; error?: string };
 export async function pingJudge0(): Promise<Judge0Health> {
   const { JUDGE0_URL } = getServerEnv();
   try {
-    const res = await fetch(`${JUDGE0_URL}/about`, {
-      headers: authHeaders(),
+    const res = await fetch(`${JUDGE0_URL.replace(/\/$/, "")}/about`, {
+      headers: judge0Headers(),
       cache: "no-store",
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return { ok: false, error: `Judge0 responded ${res.status}` };
     const body = (await res.json()) as { version?: string };

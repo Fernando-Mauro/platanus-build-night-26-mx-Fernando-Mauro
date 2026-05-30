@@ -1,98 +1,105 @@
 "use client";
 
 import { useEffect } from "react";
-import { ICONS, IconArrowRight, IconLock, IconSparkles, IconTarget } from "@/lib/icons";
+import { ICONS, IconLock, IconSparkles, IconTarget } from "@/lib/icons";
 import type { TopicStatus } from "@/lib/data";
 import { useRoadmap, type LiveTopic } from "./useRoadmap";
 
-const CW = 190, CH = 92, CANVAS_W = 960, CANVAS_H = 660;
+// Graph canvas in SVG user units; scales responsively via viewBox.
+const CANVAS_W = 800;
+const CANVAS_H = 520;
+const NODE_R = 46; // node radius
 
-const STATUS_STYLES: Record<TopicStatus, {
-  ring: string; chip: string; bar: string; dot: string; label: string; labelCls: string;
-}> = {
-  mastered: { ring: "border-emerald-500/30", chip: "bg-emerald-500/10 text-emerald-300", bar: "bg-emerald-400", dot: "bg-emerald-400", label: "Dominado",    labelCls: "text-emerald-300/90" },
-  learning: { ring: "border-amber-500/25",   chip: "bg-amber-500/10 text-amber-300",     bar: "bg-amber-400",   dot: "bg-amber-400",   label: "Aprendiendo", labelCls: "text-amber-300/90" },
-  locked:   { ring: "border-zinc-800",        chip: "bg-zinc-800/60 text-zinc-500",       bar: "bg-zinc-700",    dot: "bg-zinc-600",    label: "Bloqueado",  labelCls: "text-zinc-500" },
+const STATUS: Record<
+  TopicStatus,
+  { stroke: string; fill: string; bar: string; text: string; label: string; glow: string }
+> = {
+  mastered: { stroke: "#34d399", fill: "rgba(16,185,129,0.12)", bar: "#34d399", text: "text-emerald-300", label: "Dominado", glow: "#10b981" },
+  learning: { stroke: "#fbbf24", fill: "rgba(245,158,11,0.12)", bar: "#fbbf24", text: "text-amber-300", label: "Aprendiendo", glow: "#f59e0b" },
+  locked:   { stroke: "#3f3f46", fill: "rgba(39,39,42,0.6)", bar: "#52525b", text: "text-zinc-500", label: "Bloqueado", glow: "#27272a" },
 };
 
-function TopicNode({ t, onOpen }: { t: LiveTopic; onOpen: (t: LiveTopic) => void }) {
-  const TopicIcon = ICONS[t.icon] ?? ICONS.IconBrackets;
-  const s = STATUS_STYLES[t.status];
+function GraphNode({ t, onOpen }: { t: LiveTopic; onOpen: (t: LiveTopic) => void }) {
+  const Icon = ICONS[t.icon] ?? ICONS.IconBrackets;
+  const s = STATUS[t.status];
   const locked = t.status === "locked";
   const rec = t.recommended;
-  return (
-    <button
-      onClick={() => !locked && onOpen(t)}
-      disabled={locked}
-      style={{ left: t.left, top: t.top, width: CW }}
-      className={[
-        "group absolute rounded-xl border bg-zinc-900/80 p-3.5 text-left backdrop-blur-sm transition-all duration-200",
-        "shadow-lg shadow-black/30",
-        locked ? "cursor-not-allowed opacity-55" : "cursor-pointer hover:-translate-y-1 hover:bg-zinc-900",
-        rec ? "border-sky-500/60 shadow-sky-500/10 ring-2 ring-sky-500/40" : s.ring,
-      ].join(" ")}
-    >
-      {rec && (
-        <span className="absolute -top-2.5 left-3 flex items-center gap-1 rounded-full bg-sky-500 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-950">
-          <IconTarget size={11} strokeWidth={2.5} /> Punto débil
-        </span>
-      )}
-      <div className="flex items-center gap-2.5">
-        <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${s.chip}`}>
-          {locked ? <IconLock size={15} /> : <TopicIcon size={16} />}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium text-zinc-100">{t.name}</div>
-          <div className="truncate text-[11px] text-zinc-500">{t.blurb}</div>
-        </div>
-      </div>
+  const cx = t.left;
+  const cy = t.top;
+  // Mastery ring (circular progress around the node).
+  const ringR = NODE_R + 6;
+  const circ = 2 * Math.PI * ringR;
+  const dash = (t.mastery / 100) * circ;
 
-      <div className="mt-3 flex items-end justify-between">
-        <span className={`text-[10px] font-medium uppercase tracking-wide ${s.labelCls}`}>{s.label}</span>
-        <span className="font-mono text-base font-semibold leading-none text-zinc-100 tabular-nums">
-          {t.mastery}%
-        </span>
-      </div>
-      {/* Animated bar so the aggressive learning rate is visible (T033). */}
-      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-zinc-800">
-        <div
-          className={`h-full rounded-full ${s.bar} transition-all duration-700 ease-out`}
-          style={{ width: `${t.mastery}%` }}
-        />
-      </div>
-      <div className="mt-2 flex items-center justify-between text-[11px] text-zinc-500">
-        <span>{t.solved}</span>
-        {!locked && (
-          <span className="flex items-center gap-0.5 text-zinc-400 transition-colors group-hover:text-sky-300">
-            {rec ? "Reforzar" : "Practicar"} <IconArrowRight size={11} />
-          </span>
-        )}
-      </div>
-    </button>
+  return (
+    <g
+      transform={`translate(${cx} ${cy})`}
+      className={locked ? "cursor-not-allowed" : "cursor-pointer"}
+      onClick={() => !locked && onOpen(t)}
+      style={{ transition: "all .3s" }}
+    >
+      {/* recommended halo */}
+      {rec && <circle r={ringR + 10} fill="none" stroke="#38bdf8" strokeWidth={1.5} opacity={0.4} />}
+
+      {/* progress ring background + value */}
+      <circle r={ringR} fill="none" stroke="#27272a" strokeWidth={5} />
+      <circle
+        r={ringR}
+        fill="none"
+        stroke={s.bar}
+        strokeWidth={5}
+        strokeLinecap="round"
+        strokeDasharray={`${dash} ${circ}`}
+        transform="rotate(-90)"
+        style={{ transition: "stroke-dasharray .7s ease-out" }}
+      />
+
+      {/* node body */}
+      <circle r={NODE_R} fill="#18181b" stroke={s.stroke} strokeWidth={2} />
+      <circle r={NODE_R} fill={s.fill} />
+
+      {/* icon */}
+      <g transform="translate(-11 -22)" stroke={s.stroke}>
+        {locked ? <IconLock size={22} /> : <Icon size={22} />}
+      </g>
+
+      {/* mastery % */}
+      <text textAnchor="middle" y={6} className="fill-zinc-100 font-mono font-semibold" fontSize={17}>
+        {t.mastery}%
+      </text>
+      {/* name */}
+      <text textAnchor="middle" y={24} className="fill-zinc-400" fontSize={10}>
+        {t.name.length > 14 ? t.name.slice(0, 13) + "…" : t.name}
+      </text>
+
+      {/* recommended badge */}
+      {rec && (
+        <g transform={`translate(0 ${-ringR - 16})`}>
+          <rect x={-34} y={-9} width={68} height={18} rx={9} fill="#38bdf8" />
+          <text textAnchor="middle" y={4} className="fill-sky-950 font-semibold" fontSize={9}>
+            ◎ REFORZAR
+          </text>
+        </g>
+      )}
+    </g>
   );
 }
 
-function EdgeLines({ topics, edges }: { topics: LiveTopic[]; edges: [string, string][] }) {
-  const byId = new Map(topics.map((t) => [t.id, t]));
+function Edge({ from, to, dim }: { from: LiveTopic; to: LiveTopic; dim: boolean }) {
+  // Cubic curve between two node centers for an organic graph look.
+  const x1 = from.left, y1 = from.top, x2 = to.left, y2 = to.top;
+  const mx = (x1 + x2) / 2;
+  const d = `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
   return (
-    <svg className="pointer-events-none absolute inset-0" width={CANVAS_W} height={CANVAS_H}>
-      {edges.map(([from, to]) => {
-        const a = byId.get(from);
-        const b = byId.get(to);
-        if (!a || !b) return null;
-        const x1 = a.left + CW / 2, y1 = a.top + CH / 2;
-        const x2 = b.left + CW / 2, y2 = b.top + CH / 2;
-        return (
-          <line
-            key={`${from}-${to}`}
-            x1={x1} y1={y1} x2={x2} y2={y2}
-            stroke="currentColor"
-            strokeWidth={1.5}
-            className="text-zinc-800"
-          />
-        );
-      })}
-    </svg>
+    <path
+      d={d}
+      fill="none"
+      stroke={dim ? "#3f3f46" : "#0ea5e9"}
+      strokeWidth={dim ? 1.5 : 2.5}
+      strokeDasharray={dim ? "5 6" : "0"}
+      opacity={dim ? 0.5 : 0.8}
+      markerEnd="url(#arrow)"
+    />
   );
 }
 
@@ -105,54 +112,84 @@ export function Roadmap({
 }) {
   const { data, loading, error, refresh } = useRoadmap();
 
-  // Re-fetch whenever the parent bumps the signal (e.g. after a submission, T032).
   useEffect(() => {
     if (refreshSignal !== undefined) refresh();
   }, [refreshSignal, refresh]);
 
+  const byId = new Map((data?.topics ?? []).map((t) => [t.id, t]));
+
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-zinc-800 px-6 py-4">
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight text-zinc-100">Tu Roadmap</h1>
-          <p className="text-sm text-zinc-500">Progreso personalizado según tu desempeño</p>
+    <div className="flex h-full flex-col overflow-hidden">
+      <div className="shrink-0 px-6 pt-6">
+        <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-sky-400">
+          <IconSparkles size={14} /> Red bayesiana de conocimiento
         </div>
-        <div className="flex items-center gap-2 text-xs text-zinc-500">
-          <IconSparkles size={14} className="text-sky-400" />
-          Adaptado por IA
-        </div>
+        <h1 className="text-2xl font-semibold tracking-tight text-zinc-100">Tu Mapa</h1>
+        <p className="mt-1 text-sm text-zinc-500">
+          Cada nodo es una competencia; las aristas son prerequisitos. El dominio se actualiza con cada envío.
+        </p>
+
+        {data?.recommendation && (
+          <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-sky-500/30 bg-sky-500/[0.06] px-4 py-2.5 text-sm">
+            <IconTarget size={16} className="mt-0.5 shrink-0 text-sky-400" />
+            <span className="text-zinc-200">
+              {data.recommendation.reason === "PREREQUISITE_GAP" ? (
+                <>Refuerza <span className="font-semibold text-sky-300">{data.recommendation.competencyName}</span> — es tu prerequisito más débil.</>
+              ) : (
+                <>Siguiente paso: <span className="font-semibold text-sky-300">{data.recommendation.competencyName}</span>.</>
+              )}
+            </span>
+          </div>
+        )}
       </div>
 
-      {data?.recommendation && (
-        <div className="border-b border-zinc-800 bg-sky-500/[0.04] px-6 py-2.5 text-sm text-sky-200">
-          <IconTarget size={13} className="mr-1 inline" />
-          {data.recommendation.reason === "PREREQUISITE_GAP"
-            ? <>Refuerza <span className="font-medium">{data.recommendation.competencyName}</span> — es tu prerequisito más débil.</>
-            : <>Siguiente paso: <span className="font-medium">{data.recommendation.competencyName}</span>.</>}
-        </div>
-      )}
-
-      <div className="min-h-0 flex-1 overflow-auto p-6">
+      <div className="min-h-0 flex-1 p-4">
         {loading && (
           <div className="flex h-full items-center justify-center gap-3 text-zinc-500">
             <span className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-700 border-t-sky-400" />
-            Cargando tu roadmap…
+            Cargando tu mapa…
           </div>
         )}
         {!loading && error && (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-zinc-500">
-            <p className="text-sm">No se pudo cargar el roadmap.</p>
+            <p className="text-sm">No se pudo cargar el mapa.</p>
             <button onClick={refresh} className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800">
               Reintentar
             </button>
           </div>
         )}
         {!loading && !error && data && (
-          <div className="relative mx-auto" style={{ width: CANVAS_W, height: CANVAS_H }}>
-            <EdgeLines topics={data.topics} edges={data.edges} />
-            {data.topics.map((t) => (
-              <TopicNode key={t.id} t={t} onOpen={onOpen} />
-            ))}
+          <div className="mx-auto h-full max-w-4xl">
+            <svg
+              viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
+              className="h-full w-full"
+              style={{ maxHeight: "100%" }}
+            >
+              <defs>
+                <marker id="arrow" viewBox="0 0 10 10" refX={8} refY={5} markerWidth={6} markerHeight={6} orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#0ea5e9" opacity={0.7} />
+                </marker>
+                <radialGradient id="bg-glow" cx="50%" cy="40%" r="60%">
+                  <stop offset="0%" stopColor="#0ea5e9" stopOpacity={0.06} />
+                  <stop offset="100%" stopColor="#0ea5e9" stopOpacity={0} />
+                </radialGradient>
+              </defs>
+              <rect width={CANVAS_W} height={CANVAS_H} fill="url(#bg-glow)" />
+
+              {/* edges first (under nodes) */}
+              {data.edges.map(([a, b]) => {
+                const from = byId.get(a);
+                const to = byId.get(b);
+                if (!from || !to) return null;
+                const dim = to.status === "locked";
+                return <Edge key={`${a}-${b}`} from={from} to={to} dim={dim} />;
+              })}
+
+              {/* nodes */}
+              {data.topics.map((t) => (
+                <GraphNode key={t.id} t={t} onOpen={onOpen} />
+              ))}
+            </svg>
           </div>
         )}
       </div>

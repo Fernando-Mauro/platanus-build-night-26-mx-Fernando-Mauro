@@ -61,12 +61,26 @@ export type ProblemListItem = {
   title: string;
   difficulty: string;
   competencies: { id: number; name: string; slug: string }[];
+  attempts: number;
+  solved: boolean;
+};
+
+export type ActivityItem = {
+  id: number;
+  title: string;
+  verdict: SubmissionResponse["verdict"];
+  passedCount: number;
+  totalCount: number;
+  createdAt: string;
 };
 
 export const fetchRoadmap = () => getJSON<RoadmapResponse>("/api/roadmap");
 
 export const fetchProblems = () =>
   getJSON<{ problems: ProblemListItem[] }>("/api/problems").then((r) => r.problems);
+
+export const fetchActivity = () =>
+  getJSON<{ activity: ActivityItem[] }>("/api/activity").then((r) => r.activity);
 
 export const fetchProblem = (id: number) =>
   getJSON<{ problem: ProblemDetail }>(`/api/problems/${id}`).then((r) => r.problem);

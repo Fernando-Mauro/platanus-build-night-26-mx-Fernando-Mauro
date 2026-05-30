@@ -8,16 +8,13 @@ import { Home } from "@/features/home/Home";
 import { Problems } from "@/features/problems/Problems";
 import { Roadmap } from "@/features/roadmap/Roadmap";
 import { Workspace } from "@/features/workspace/Workspace";
-import { USER } from "@/lib/data";
 import {
   IconAward,
   IconBookOpen,
-  IconFlame,
   IconHome,
   IconList,
   IconLogOut,
   IconRoute,
-  IconTrendingUp,
   IconUser,
   type IconComponent,
 } from "@/lib/icons";
@@ -60,7 +57,13 @@ function Nav({ view, go }: { view: View; go: (v: View) => void }) {
   );
 }
 
-function UserMenu({ onLogout }: { onLogout: () => void }) {
+function UserMenu({
+  user,
+  onLogout,
+}: {
+  user: { name: string; email: string; initials: string };
+  onLogout: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -77,29 +80,20 @@ function UserMenu({ onLogout }: { onLogout: () => void }) {
   ];
   return (
     <div className="flex items-center gap-4">
-      <span className="hidden items-center gap-1.5 text-sm text-zinc-300 sm:flex">
-        <IconFlame size={15} className="text-orange-400" /> <span className="font-medium">{USER.streak}</span>
-        <span className="text-zinc-500">días</span>
-      </span>
-      <span className="hidden h-4 w-px bg-zinc-800 sm:block" />
-      <span className="hidden items-center gap-1.5 text-sm sm:flex">
-        <IconTrendingUp size={15} className="text-sky-400" />
-        <span className="font-mono font-medium text-zinc-200">{USER.rating}</span>
-      </span>
       <div ref={ref} className="relative">
         <button
           onClick={() => setOpen((o) => !o)}
           className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-zinc-700 to-zinc-800 text-xs font-semibold text-zinc-200 ring-1 ring-zinc-700 transition-all hover:ring-zinc-600"
         >
-          {USER.initials}
+          {user.initials}
         </button>
         {open && (
           <div className="absolute right-0 top-full z-30 mt-2 w-56 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 p-1.5 shadow-2xl shadow-black/50">
             <div className="flex items-center gap-3 px-2.5 py-2">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-zinc-700 to-zinc-800 text-xs font-semibold text-zinc-200 ring-1 ring-zinc-700">{USER.initials}</span>
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-zinc-700 to-zinc-800 text-xs font-semibold text-zinc-200 ring-1 ring-zinc-700">{user.initials}</span>
               <div className="min-w-0">
-                <div className="truncate text-sm font-medium text-zinc-100">{USER.name}</div>
-                <div className="truncate text-xs text-zinc-500">{USER.handle}</div>
+                <div className="truncate text-sm font-medium text-zinc-100">{user.name}</div>
+                <div className="truncate text-xs text-zinc-500">{user.email}</div>
               </div>
             </div>
             <div className="my-1 h-px bg-zinc-800" />
@@ -120,7 +114,7 @@ function UserMenu({ onLogout }: { onLogout: () => void }) {
 }
 
 export default function App() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const [view, setView] = useState<View>("home");
   const [selectedProblemId, setSelectedProblemId] = useState<number | null>(null);
   const [roadmapSignal, setRoadmapSignal] = useState(0);
@@ -140,12 +134,18 @@ export default function App() {
   };
   const bumpRoadmap = () => setRoadmapSignal((s) => s + 1);
 
-  // Real auth (feature 002): unauthenticated → show Login. Login handles the
-  // Cognito credentials sign-in/registration itself; on success it refreshes
-  // the session so this component re-renders authenticated.
+  // Real auth: unauthenticated → show Login. Login handles local
+  // sign-in/registration itself; on success it refreshes the session so this
+  // component re-renders authenticated.
   if (status !== "authenticated") {
     return <Login onSignedIn={() => window.location.reload()} />;
   }
+
+  const displayName =
+    session?.user?.name || session?.user?.email?.split("@")[0] || "Estudiante";
+  const initials =
+    displayName.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "U";
+  const sessionUser = { name: displayName, email: session?.user?.email || "", initials };
 
   return (
     <div className="flex h-screen flex-col bg-zinc-950 text-zinc-300">
@@ -154,7 +154,7 @@ export default function App() {
         <Nav view={view} go={go} />
         <div className="flex items-center gap-3">
           <HealthBadge />
-          <UserMenu onLogout={() => signOut({ callbackUrl: "/" })} />
+          <UserMenu user={sessionUser} onLogout={() => signOut({ callbackUrl: "/" })} />
         </div>
       </header>
       <main className="min-h-0 flex-1">

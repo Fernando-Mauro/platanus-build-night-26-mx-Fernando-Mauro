@@ -1,5 +1,5 @@
 {
-  "project-name": "<FILL THIS>",
-  "project-oneliner": "<FILL THIS>",
-  "project-description": "<FILL THIS>"
+  "project-name": "Vértice",
+  "project-oneliner": "Plataforma de aprendizaje de programación competitiva que adapta tu roadmap en tiempo real según tu maestría.",
+  "project-description": "Vértice es una plataforma adaptativa de aprendizaje de programación competitiva. Los alumnos resuelven problemas que se evalúan con un Judge0 self-hosted, y un motor de inteligencia bayesiana estima la maestría del alumno por competencia (Arreglos, Loops/Hashing, Recursión, Árboles, Grafos) actualizándola de forma inmediata tras cada veredicto. El learning rate es agresivo: uno o dos fallos en un tema bajan la maestría de forma notoria (~15 puntos por veredicto) y reconfiguran el roadmap al instante. Cuando la maestría de un tema cae por debajo del 40%, el roadmap bloquea los temas avanzados que dependen de él y recomienda un problema de refuerzo de un prerrequisito, con una banda de histéresis de ±5 puntos para evitar oscilaciones; el tema se vuelve a desbloquear al superar el 45%. Cada alumno arranca con una maestría neutral del 50% y un set determinista de 10 problemas fundamentales sembrados. Construida con Next.js 15 (App Router) sobre AWS ECS Fargate + ALB, PostgreSQL en RDS vía Prisma, autenticación con Amazon Cognito + Auth.js, e infraestructura como código con AWS CDK."
 }

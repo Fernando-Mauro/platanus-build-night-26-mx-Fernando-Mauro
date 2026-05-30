@@ -1,33 +1,30 @@
-// Registration endpoint (T014). Creates the Cognito user (SignUp) and, when a
-// verification code is supplied, confirms it (ConfirmSignUp). Credentials flow —
-// no OAuth redirect, works over HTTP.
+// User registration (local auth). POST { email, password } → create the user
+// with a hashed password + cold-start mastery (50% per competency). No email
+// verification step (off-AWS demo).
 import { NextResponse } from "next/server";
-import { cognitoSignUp, cognitoConfirmSignUp } from "@/features/auth/cognito";
-
-export const dynamic = "force-dynamic";
+import { registerUser } from "@/lib/db/users";
+import { ensureColdStartMastery } from "@/lib/db/knowledge";
 
 export async function POST(req: Request) {
-  let body: { email?: string; password?: string; name?: string; code?: string };
+  const body = await req.json().catch(() => null);
+  const email = (body?.email as string | undefined)?.toLowerCase().trim();
+  const password = body?.password as string | undefined;
+  if (!email || !password) {
+    return NextResponse.json({ error: "Correo y contraseña son obligatorios." }, { status: 400 });
+  }
+  if (password.length < 6) {
+    return NextResponse.json({ error: "La contraseña debe tener al menos 6 caracteres." }, { status: 400 });
+  }
   try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "invalid body" }, { status: 400 });
+    const user = await registerUser({ email, password });
+    try {
+      await ensureColdStartMastery(user.id);
+    } catch (err) {
+      console.error("ensureColdStartMastery failed (non-fatal):", err);
+    }
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "No se pudo registrar.";
+    return NextResponse.json({ error: msg }, { status: 400 });
   }
-  const { email, password, name, code } = body;
-  if (!email) return NextResponse.json({ error: "email required" }, { status: 422 });
-
-  // Step 2: confirm with the emailed code.
-  if (code) {
-    const r = await cognitoConfirmSignUp(email, code);
-    return r.ok
-      ? NextResponse.json({ status: "confirmed" })
-      : NextResponse.json({ error: r.error }, { status: 400 });
-  }
-
-  // Step 1: create the account (Cognito emails a verification code).
-  if (!password) return NextResponse.json({ error: "password required" }, { status: 422 });
-  const r = await cognitoSignUp(email, password, name);
-  return r.ok
-    ? NextResponse.json({ status: "verification_sent" })
-    : NextResponse.json({ error: r.error }, { status: 400 });
 }

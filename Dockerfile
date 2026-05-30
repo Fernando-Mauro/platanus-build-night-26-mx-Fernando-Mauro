@@ -51,6 +51,16 @@ COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 # `public/` may be empty but must exist for Next's static serving.
 COPY --from=build /app/public ./public
+
+# Prisma db-push + seed at startup need the schema, the seed script, and the
+# migration engine (prisma CLI + @prisma/engines), which Next's standalone
+# tracing does NOT include. Copy them on top of the traced bundle.
+COPY --from=build /app/prisma ./prisma
+COPY --from=build /app/node_modules/prisma ./node_modules/prisma
+COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=build /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
+
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 

@@ -2,14 +2,13 @@
 // every competency with derived mastery + status (hysteresis applied) and the
 // current recommendation. (contracts/mastery-api.md, FR-015)
 import { NextResponse } from "next/server";
-import { auth } from "@/features/auth/auth.config";
+import { getCurrentUserId } from "@/features/auth/session";
 import { getRoadmap } from "@/lib/db/knowledge";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const session = await auth();
-  const userId = (session?.user as { internalId?: number } | undefined)?.internalId;
+  const userId = await getCurrentUserId();
   if (!userId) {
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   }

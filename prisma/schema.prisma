@@ -23,17 +23,18 @@ model HealthCheck {
   @@map("health_check")
 }
 
-/// Learner identity (feature 002). `cognitoId` is the external Cognito `sub`,
-/// the stable key the Auth.js session maps to and that all mastery/submission
-/// rows reference for referential integrity. Local email/password from feature
-/// 001 are optional now that auth lives in Cognito.
+/// Learner identity. Auth is local (email + scrypt password hash) now that the
+/// platform runs off-AWS (Vercel + Neon). `cognitoId` is kept optional for
+/// backward-compat with rows created under the old Cognito flow; new users use
+/// `passwordHash`. All mastery/submission rows FK to `users.id`.
 model User {
-  id          Int      @id @default(autoincrement())
-  cognitoId   String   @unique @map("cognito_id")
-  email       String   @unique
-  displayName String?  @map("display_name")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id           Int      @id @default(autoincrement())
+  cognitoId    String?  @unique @map("cognito_id")
+  email        String   @unique
+  passwordHash String?  @map("password_hash")
+  displayName  String?  @map("display_name")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   masteries   ConceptMastery[]
   submissions Submission[]
@@ -81,6 +82,7 @@ model Problem {
   difficulty   String  // "Fácil" | "Media" | "Difícil"
   statement    String
   starterCode  String? @map("starter_code")
+  referenceSolution String? @map("reference_solution") // demo "reference" eval mode
   languageId   Int     @map("language_id") // Judge0 language id (default C++)
   testCases    Json    @map("test_cases")  // [{input, expectedOutput, hidden}]
   competencies ProblemCompetency[]
