@@ -37,7 +37,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.internalUserId as number | undefined;
+        const internalId = (token as { internalUserId?: number }).internalUserId;
+        if (internalId !== undefined) session.user.id = internalId;
         session.user.cognitoId = token.sub;
       }
       return session;
