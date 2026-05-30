@@ -1,7 +1,9 @@
 "use client";
 
-import { EDGES, TOPICS, type Topic, type TopicStatus } from "@/lib/data";
-import { ICONS, IconArrowRight, IconLock, IconPlay, IconSparkles, IconTarget } from "@/lib/icons";
+import { useEffect } from "react";
+import { ICONS, IconArrowRight, IconLock, IconSparkles, IconTarget } from "@/lib/icons";
+import type { TopicStatus } from "@/lib/data";
+import { useRoadmap, type LiveTopic } from "./useRoadmap";
 
 const CW = 190, CH = 92, CANVAS_W = 960, CANVAS_H = 660;
 
@@ -13,8 +15,8 @@ const STATUS_STYLES: Record<TopicStatus, {
   locked:   { ring: "border-zinc-800",        chip: "bg-zinc-800/60 text-zinc-500",       bar: "bg-zinc-700",    dot: "bg-zinc-600",    label: "Bloqueado",  labelCls: "text-zinc-500" },
 };
 
-function TopicNode({ t, onOpen }: { t: Topic; onOpen: (t: Topic) => void }) {
-  const TopicIcon = ICONS[t.icon];
+function TopicNode({ t, onOpen }: { t: LiveTopic; onOpen: (t: LiveTopic) => void }) {
+  const TopicIcon = ICONS[t.icon] ?? ICONS.IconBrackets;
   const s = STATUS_STYLES[t.status];
   const locked = t.status === "locked";
   const rec = t.recommended;
@@ -48,122 +50,111 @@ function TopicNode({ t, onOpen }: { t: Topic; onOpen: (t: Topic) => void }) {
       <div className="mt-3 flex items-end justify-between">
         <span className={`text-[10px] font-medium uppercase tracking-wide ${s.labelCls}`}>{s.label}</span>
         <span className="font-mono text-base font-semibold leading-none text-zinc-100 tabular-nums">
-          {t.mastery}<span className="text-xs text-zinc-500">%</span>
+          {t.mastery}%
         </span>
       </div>
-      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
-        <div className={`h-full rounded-full ${s.bar} transition-all`} style={{ width: `${t.mastery}%` }} />
+      {/* Animated bar so the aggressive learning rate is visible (T033). */}
+      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-zinc-800">
+        <div
+          className={`h-full rounded-full ${s.bar} transition-all duration-700 ease-out`}
+          style={{ width: `${t.mastery}%` }}
+        />
       </div>
       <div className="mt-2 flex items-center justify-between text-[11px] text-zinc-500">
-        <span>Dominio estimado</span>
-        <span className="font-mono">{t.solved}</span>
+        <span>{t.solved}</span>
+        {!locked && (
+          <span className="flex items-center gap-0.5 text-zinc-400 transition-colors group-hover:text-sky-300">
+            {rec ? "Reforzar" : "Practicar"} <IconArrowRight size={11} />
+          </span>
+        )}
       </div>
     </button>
   );
 }
 
-function KnowledgeTree({ onOpen }: { onOpen: (t: Topic) => void }) {
-  const byId = Object.fromEntries(TOPICS.map((t) => [t.id, t])) as Record<string, Topic>;
-  const center = (t: Topic) => ({ x: t.left + CW / 2, y: t.top + CH / 2 });
+function EdgeLines({ topics, edges }: { topics: LiveTopic[]; edges: [string, string][] }) {
+  const byId = new Map(topics.map((t) => [t.id, t]));
   return (
-    <div className="relative mx-auto" style={{ width: CANVAS_W, height: CANVAS_H }}>
-      <svg className="pointer-events-none absolute inset-0" width={CANVAS_W} height={CANVAS_H}>
-        {EDGES.map(([a, b], i) => {
-          const s = center(byId[a]), e = center(byId[b]);
-          const my = (s.y + e.y) / 2;
-          const d = `M ${s.x} ${s.y} C ${s.x} ${my}, ${e.x} ${my}, ${e.x} ${e.y}`;
-          const toLocked = byId[b].status === "locked";
-          const active = byId[a].recommended || byId[b].recommended;
-          return (
-            <path
-              key={i}
-              d={d}
-              fill="none"
-              stroke={active ? "#38bdf8" : toLocked ? "#3f3f46" : "#52525b"}
-              strokeWidth={active ? 2 : 1.5}
-              strokeDasharray={toLocked ? "5 6" : "0"}
-              opacity={toLocked ? 0.6 : 0.85}
-            />
-          );
-        })}
-      </svg>
-      {TOPICS.map((t) => (
-        <TopicNode key={t.id} t={t} onOpen={onOpen} />
-      ))}
-    </div>
+    <svg className="pointer-events-none absolute inset-0" width={CANVAS_W} height={CANVAS_H}>
+      {edges.map(([from, to]) => {
+        const a = byId.get(from);
+        const b = byId.get(to);
+        if (!a || !b) return null;
+        const x1 = a.left + CW / 2, y1 = a.top + CH / 2;
+        const x2 = b.left + CW / 2, y2 = b.top + CH / 2;
+        return (
+          <line
+            key={`${from}-${to}`}
+            x1={x1} y1={y1} x2={x2} y2={y2}
+            stroke="currentColor"
+            strokeWidth={1.5}
+            className="text-zinc-800"
+          />
+        );
+      })}
+    </svg>
   );
 }
 
-function Legend() {
-  const items: [string, string][] = [
-    ["bg-emerald-400", "Dominado"],
-    ["bg-amber-400", "Aprendiendo"],
-    ["bg-zinc-600", "Bloqueado"],
-  ];
-  return (
-    <div className="absolute right-5 top-5 z-10 flex items-center gap-4 rounded-lg border border-zinc-800 bg-zinc-950/70 px-3.5 py-2 text-[11px] backdrop-blur">
-      {items.map(([c, l]) => (
-        <span key={l} className="flex items-center gap-1.5 text-zinc-400">
-          <span className={`h-2 w-2 rounded-full ${c}`} />
-          {l}
-        </span>
-      ))}
-    </div>
-  );
-}
+export function Roadmap({
+  onOpen,
+  refreshSignal,
+}: {
+  onOpen: (t?: unknown) => void;
+  refreshSignal?: number;
+}) {
+  const { data, loading, error, refresh } = useRoadmap();
 
-function ContinueCTA({ onGo }: { onGo: () => void }) {
-  return (
-    <button
-      onClick={onGo}
-      className="group relative flex w-full max-w-sm items-center gap-4 overflow-hidden rounded-xl border border-sky-500/40 bg-gradient-to-br from-sky-500/15 to-sky-500/[0.03] p-4 text-left transition-all hover:border-sky-400/60 hover:from-sky-500/20"
-    >
-      <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-sky-500/20 blur-2xl transition-opacity group-hover:opacity-80" />
-      <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-sky-500 text-sky-950 shadow-lg shadow-sky-500/30">
-        <IconPlay size={18} />
-      </span>
-      <div className="relative min-w-0 flex-1">
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-sky-400">Continuar aprendizaje</div>
-        <div className="mt-0.5 truncate text-sm font-semibold text-zinc-100">Two Sum · reforzando Hashing</div>
-        <div className="truncate text-xs text-zinc-400">Siguiente problema sugerido por tu modelo</div>
-      </div>
-      <IconArrowRight size={18} className="relative shrink-0 text-sky-400 transition-transform group-hover:translate-x-1" />
-    </button>
-  );
-}
+  // Re-fetch whenever the parent bumps the signal (e.g. after a submission, T032).
+  useEffect(() => {
+    if (refreshSignal !== undefined) refresh();
+  }, [refreshSignal, refresh]);
 
-export function Roadmap({ onOpen, onGo }: { onOpen: (t?: Topic) => void; onGo: () => void }) {
   return (
-    <div className="mx-auto h-full max-w-6xl overflow-y-auto px-8 py-8">
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-6">
+    <div className="flex h-full flex-col">
+      <div className="flex items-center justify-between border-b border-zinc-800 px-6 py-4">
         <div>
-          <div className="flex items-center gap-1.5 text-xs font-medium text-sky-400">
-            <IconSparkles size={14} /> Motor adaptativo bayesiano
-          </div>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-zinc-100">Mapa de Conocimiento</h1>
-          <p className="mt-1.5 max-w-md text-sm text-zinc-500">
-            Cada nodo refleja tu <span className="text-zinc-300">dominio estimado</span>, inferido de tus envíos mediante una red bayesiana que propaga evidencia entre temas relacionados.
-          </p>
+          <h1 className="text-lg font-semibold tracking-tight text-zinc-100">Tu Roadmap</h1>
+          <p className="text-sm text-zinc-500">Progreso personalizado según tu desempeño</p>
         </div>
-        <ContinueCTA onGo={onGo} />
+        <div className="flex items-center gap-2 text-xs text-zinc-500">
+          <IconSparkles size={14} className="text-sky-400" />
+          Adaptado por IA
+        </div>
       </div>
 
-      <div className="mb-5 flex items-center gap-3 rounded-lg border border-amber-500/20 bg-amber-500/[0.06] px-4 py-2.5 text-sm">
-        <IconTarget size={16} className="shrink-0 text-amber-400" />
-        <span className="text-zinc-300">
-          Tu modelo detecta una debilidad en <b className="font-semibold text-amber-300">Grafos</b> — probabilidad de dominio del <b className="font-semibold text-amber-300">28 %</b>. Reforzarlo desbloqueará <span className="text-zinc-400">Programación Dinámica</span>.
-        </span>
-      </div>
+      {data?.recommendation && (
+        <div className="border-b border-zinc-800 bg-sky-500/[0.04] px-6 py-2.5 text-sm text-sky-200">
+          <IconTarget size={13} className="mr-1 inline" />
+          {data.recommendation.reason === "PREREQUISITE_GAP"
+            ? <>Refuerza <span className="font-medium">{data.recommendation.competencyName}</span> — es tu prerequisito más débil.</>
+            : <>Siguiente paso: <span className="font-medium">{data.recommendation.competencyName}</span>.</>}
+        </div>
+      )}
 
-      <div
-        className="relative overflow-auto rounded-2xl border border-zinc-800 bg-zinc-900/30 p-6"
-        style={{
-          backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.045) 1px, transparent 0)",
-          backgroundSize: "22px 22px",
-        }}
-      >
-        <Legend />
-        <KnowledgeTree onOpen={onOpen} />
+      <div className="min-h-0 flex-1 overflow-auto p-6">
+        {loading && (
+          <div className="flex h-full items-center justify-center gap-3 text-zinc-500">
+            <span className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-700 border-t-sky-400" />
+            Cargando tu roadmap…
+          </div>
+        )}
+        {!loading && error && (
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-zinc-500">
+            <p className="text-sm">No se pudo cargar el roadmap.</p>
+            <button onClick={refresh} className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800">
+              Reintentar
+            </button>
+          </div>
+        )}
+        {!loading && !error && data && (
+          <div className="relative mx-auto" style={{ width: CANVAS_W, height: CANVAS_H }}>
+            <EdgeLines topics={data.topics} edges={data.edges} />
+            {data.topics.map((t) => (
+              <TopicNode key={t.id} t={t} onOpen={onOpen} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

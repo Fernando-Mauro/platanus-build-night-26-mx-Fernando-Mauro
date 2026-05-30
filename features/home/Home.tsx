@@ -2,6 +2,7 @@
 
 import { ProblemList } from "@/components/ProblemList";
 import { ACTIVITY, HEATMAP, PROBLEMS, TOPICS, USER, type ActivityKind } from "@/lib/data";
+import { useRoadmap } from "@/features/roadmap/useRoadmap";
 import {
   ICONS,
   IconArrowRight,

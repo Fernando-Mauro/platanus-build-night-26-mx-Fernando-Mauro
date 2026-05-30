@@ -71,36 +71,36 @@ over the ECS→EC2 path, and a roadmap UI that visibly reacts to probability cha
 
 ### Data foundation (schema + seed)
 
-- [ ] T016 Expand `prisma/schema.prisma` for the Bayesian model (competencies, `concept_prerequisites`, `problem_concepts`, `concept_mastery`, `topic_mastery`, `model_versions` with `params` jsonb, `recommendations`); migrate. (data-model.md)
-- [ ] T017 Build the data-access layer in `lib/db` for competencies, mastery (read/write), tuning params, and recommendations — the only Prisma caller (Principle I/IV).
-- [ ] T018 Seed RDS in `prisma/seed.ts`: the **5-competency linear chain** (Arreglos → Loops/Hashing → Recursión → Árboles → Grafos), **10 hardcoded problems** (~2/competency) with visible + hidden test cases and Judge0 language ids, and one active `model_versions` row with the demo tuning (`±15`, gate 40/45, coldStart 50). Deterministic. (FR-016)
-- [ ] T019 Implement `lib/db` cold-start helper: create 50% `concept_mastery` for all competencies on first learner sync (FR-015); called from `jit-sync` (T011).
+- [X] T016 Expand `prisma/schema.prisma` for the Bayesian model. **Note:** implemented with a simplified **1:1 topic↔competency** model — competencies carry `prerequisiteId` (linear chain) instead of a separate `concept_prerequisites` table, and topic mastery is **derived** from the single competency (no separate `topic_mastery`/`recommendations` tables; recommendation is computed live). Migrated locally (`20260530_bayesian_engine`).
+- [X] T017 Data-access layer in `lib/db`: `lib/db/knowledge.ts` (competencies, mastery read/write, tuning, recommendation/gating) + `lib/db/problems.ts` (list/detail) + `lib/db/submissions.ts` (idempotent apply). Only Prisma callers (Principle I/IV).
+- [X] T018 Seed RDS in `prisma/seed.ts`: 5-competency linear chain + 10 problems (2/competency) + active `model_versions` demo tuning. Deterministic. (FR-016)
+- [X] T019 Cold-start helper `ensureColdStartMastery(userId)` in `lib/db/knowledge.ts` (50% per competency); wired into `features/auth/jit-sync.ts` (best-effort). (FR-015)
 
 ### Bayesian engine (US1 + US2)
 
-- [ ] T020 [P] [US1] Implement `features/knowledge/update.ts`: bounded linear update — `base = pass? +15 : −15`, split equally across the problem's competencies (`base / nCompetencies`), clamp [0,100], set `last_submission_id`; reads tuning from `model_versions.params`. (FR-003/004/006/007/013)
-- [ ] T021 [P] [US1] Implement topic-mastery aggregation in `features/knowledge` (mean of competencies) feeding `topic_mastery`. (FR-008)
-- [ ] T022 [US1] Implement the idempotent apply path in `lib/db` guarded by `submissions.evidence_applied_at` so a verdict updates mastery exactly once; no update on non-verdict/error. (FR-005/014/017)
-- [ ] T023 [P] [US1] Unit-test the engine in `tests/unit/knowledge.test.ts`: pass/fail deltas, equal multi-competency split (−15→−7.5×2), clamping, idempotency, and SC-002 (50→35→20 over two fails).
+- [X] T020 [P] [US1] `features/knowledge/update.ts`: bounded linear update (`±15` equal split, clamp [0,100]); tuning via `features/knowledge/tuning.ts` from `model_versions.params`. (FR-003/004/006/007/013)
+- [X] T021 [P] [US1] Topic mastery derived from the 1:1 competency in `getRoadmap` (no separate table needed in the simplified model). (FR-008)
+- [X] T022 [US1] Idempotent apply path `applyMasteryDeltas` in `lib/db/submissions.ts` guarded by `submissions.evidence_applied_at` (re-checked inside the transaction); no update on non-real verdict. (FR-005/014/017)
+- [X] T023 [P] [US1] Unit tests in `tests/unit/knowledge.test.ts` (pass/fail deltas, −15→−7.5×2 split, clamp, ERROR=no-op, SC-002 50→35→20). ⚠️ written; not yet run — see verification note.
 
 ### Judge0 submission integration on AWS (US1 — ECS → EC2)
 
-- [ ] T024 [US1] Implement the full evaluation in `features/evaluation/evaluate.ts` (batch submit to Judge0, await ≤30s, normalize verdict, fail-closed) using `JUDGE0_URL` (private EC2) — confirm the Fargate task SG → Judge0 SG path works in AWS, not just locally.
-- [ ] T025 [US1] Implement `POST /api/submissions` (authenticated): persist submission/verdicts, run `evaluate`, then run the mastery update (T020–T022) once; return verdict + `masteryDelta` + `gating`. (contracts/mastery-api.md)
-- [ ] T026 [US1] Wire `features/workspace/Workspace.tsx` to real submit (replace the mock Running→verdict sequence with the `/api/submissions` call + loading state).
+- [X] T024 [US1] `features/evaluation/evaluate.ts`: batch submit to Judge0 + poll ≤28s, normalize verdict (PASSED/FAILED/LIMIT_EXCEEDED/ERROR), fail-closed. ⚠️ AWS SG path (Fargate→Judge0) not re-confirmed this session.
+- [X] T025 [US1] `POST /api/submissions` (authenticated): persist → evaluate → apply mastery once → return verdict + `masteryDelta` + `gating`. (contracts/mastery-api.md)
+- [X] T026 [US1] `features/workspace/Workspace.tsx` rewritten data-driven: fetches the problem, **editable code editor**, real `POST /api/submissions`, renders verdict + mastery delta + gating. `page.tsx` threads the selected `problemId` (roadmap nodes open their recommended problem). Build-verified.
 
 ### Adaptive gating & recommendations (US3)
 
-- [ ] T027 [P] [US3] Implement `features/knowledge/gating.ts`: ±5 hysteresis — lock dependent advanced topic when topic mastery `< 40`, re-unlock only when `> 45`. (FR-009/011/012)
-- [ ] T028 [P] [US3] Implement `features/knowledge/recommend.ts`: when a topic is gated, recommend a prerequisite reinforcement problem (or easier same-topic if no prereq). (FR-010)
-- [ ] T029 [US3] Implement `GET /api/roadmap` (authenticated): topics with derived mastery + status (with hysteresis), competencies' mastery, and the current recommendation. (contracts/mastery-api.md, FR-015)
-- [ ] T030 [P] [US3] Unit-test gating/recommendation in `tests/unit/gating.test.ts`: lock<40, no-unlock-at-40, unlock>45, prerequisite-vs-easier selection.
+- [X] T027 [P] [US3] `features/knowledge/gating.ts`: hysteresis — lock when `< 40`, unlock only when `> 45`, sticky dead-band in between (FR-009/011/012). Persisted via `ConceptMastery.status` in `getRoadmap`.
+- [X] T028 [P] [US3] `features/knowledge/recommend.ts`: weakest prerequisite-gap reinforcement, else advance; easiest problem chosen by `pickEasiestProblemId`. (FR-010)
+- [X] T029 [US3] `GET /api/roadmap` (authenticated): competencies with derived mastery + status (hysteresis) + current recommendation. (contracts/mastery-api.md, FR-015)
+- [X] T030 [P] [US3] Unit tests in `tests/unit/gating.test.ts` (lock<40, no-unlock-at-40, unlock>45, weakest-gap vs advance vs null). ⚠️ written; not yet run.
 
 ### Real-time Roadmap UI (US2)
 
-- [ ] T031 [US2] Wire `features/roadmap/Roadmap.tsx` + `features/home/Home.tsx` to `GET /api/roadmap` (replace mock `lib/data.ts`); render live per-competency/topic mastery, locked badges, and the recommended next step.
-- [ ] T032 [US2] After a submission verdict, refresh the roadmap so the mastery change and any new lock/recommendation appear immediately (≤ one refresh, SC-001/SC-003); surface the `masteryDelta` from the submission response as a visible cue ("Recursión 50% → 35%").
-- [ ] T033 [P] [US2] Make the aggressive learning rate visible: ensure 1–2 fails produce a large, animated bar change in the UI (driven by real data, not mock).
+- [X] T031 [US2] `features/roadmap/Roadmap.tsx` + `features/home/Home.tsx` wired to `GET /api/roadmap` via `features/roadmap/useRoadmap.ts`; live per-competency mastery, locked badges, and the recommended next step (banner). Build-verified.
+- [X] T032 [US2] Submission→refresh loop closed: `onSubmitted` bumps `refreshSignal` so the roadmap re-fetches after each verdict; the `masteryDelta` cue ("Recursión 50% → 35%") renders in the console. (SC-001/SC-003)
+- [X] T033 [P] [US2] Animated mastery bars (`transition-all duration-700`) driven by real engine data — 1–2 fails produce a visible jump.
 
 ---
 

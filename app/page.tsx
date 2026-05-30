@@ -122,9 +122,23 @@ function UserMenu({ onLogout }: { onLogout: () => void }) {
 export default function App() {
   const { status } = useSession();
   const [view, setView] = useState<View>("home");
+  const [selectedProblemId, setSelectedProblemId] = useState<number | null>(null);
+  const [roadmapSignal, setRoadmapSignal] = useState(0);
 
   const go = (v: View) => setView(v);
-  const openProblem = () => setView("workspace");
+  // Open a problem: an explicit id, or a roadmap node carrying its recommended
+  // problem id, else null (Workspace falls back to the first seeded problem).
+  const openProblem = (arg?: unknown) => {
+    let id: number | null = null;
+    if (typeof arg === "number") id = arg;
+    else if (arg && typeof arg === "object" && "recommendedProblemId" in arg) {
+      const r = (arg as { recommendedProblemId?: number | null }).recommendedProblemId;
+      id = typeof r === "number" ? r : null;
+    }
+    setSelectedProblemId(id);
+    setView("workspace");
+  };
+  const bumpRoadmap = () => setRoadmapSignal((s) => s + 1);
 
   // Real auth (feature 002): unauthenticated → show Login. Login handles the
   // Cognito credentials sign-in/registration itself; on success it refreshes
@@ -146,8 +160,14 @@ export default function App() {
       <main className="min-h-0 flex-1">
         {view === "home" && <Home onOpen={openProblem} onGo={openProblem} onSeeAll={() => go("problems")} onMap={() => go("map")} />}
         {view === "problems" && <Problems onOpen={openProblem} />}
-        {view === "map" && <Roadmap onOpen={openProblem} onGo={openProblem} />}
-        {view === "workspace" && <Workspace onBack={() => go("problems")} />}
+        {view === "map" && <Roadmap onOpen={openProblem} refreshSignal={roadmapSignal} />}
+        {view === "workspace" && (
+          <Workspace
+            onBack={() => go("map")}
+            problemId={selectedProblemId}
+            onSubmitted={bumpRoadmap}
+          />
+        )}
       </main>
     </div>
   );
