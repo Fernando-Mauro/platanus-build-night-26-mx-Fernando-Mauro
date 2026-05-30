@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { signIn, signOut, useSession } from "next-auth/react";
 import { HealthBadge } from "@/components/HealthBadge";
 import { BrandMark, Login } from "@/features/auth/Login";
 import { Home } from "@/features/home/Home";
@@ -119,13 +120,17 @@ function UserMenu({ onLogout }: { onLogout: () => void }) {
 }
 
 export default function App() {
-  const [authed, setAuthed] = useState(false);
+  const { status } = useSession();
   const [view, setView] = useState<View>("home");
 
   const go = (v: View) => setView(v);
   const openProblem = () => setView("workspace");
 
-  if (!authed) return <Login onAuth={() => { setAuthed(true); setView("home"); }} />;
+  // Real auth (feature 002): unauthenticated → show Login, which triggers the
+  // Cognito sign-in (hosted UI) via Auth.js. Registration is the Cognito sign-up.
+  if (status !== "authenticated") {
+    return <Login onAuth={() => signIn("cognito", { callbackUrl: "/" })} />;
+  }
 
   return (
     <div className="flex h-screen flex-col bg-zinc-950 text-zinc-300">
@@ -134,7 +139,7 @@ export default function App() {
         <Nav view={view} go={go} />
         <div className="flex items-center gap-3">
           <HealthBadge />
-          <UserMenu onLogout={() => { setAuthed(false); setView("home"); }} />
+          <UserMenu onLogout={() => signOut({ callbackUrl: "/" })} />
         </div>
       </header>
       <main className="min-h-0 flex-1">

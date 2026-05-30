@@ -15,6 +15,11 @@ interface AppStackProps extends cdk.StackProps {
   dbSecret: secretsmanager.ISecret;
   judge0PrivateIp: string;
   judge0Secret: secretsmanager.ISecret;
+  // Cognito (feature 002) — non-sensitive ids as strings; client secret via Secrets Manager.
+  cognitoIssuer: string;
+  cognitoUserPoolId: string;
+  cognitoClientId: string;
+  cognitoClientSecret: secretsmanager.ISecret;
 }
 
 /**
@@ -67,12 +72,18 @@ export class AppStack extends cdk.Stack {
             DB_PORT: "5432",
             DB_NAME: "vertice",
             JUDGE0_URL: `http://${props.judge0PrivateIp}:2358`,
+            // Cognito non-sensitive config (issuer + ids). NEXT_PUBLIC_* are safe client-side.
+            COGNITO_ISSUER: props.cognitoIssuer,
+            NEXT_PUBLIC_COGNITO_USER_POOL_ID: props.cognitoUserPoolId,
+            NEXT_PUBLIC_COGNITO_CLIENT_ID: props.cognitoClientId,
+            COGNITO_CLIENT_ID: props.cognitoClientId,
           },
           secrets: {
             DB_USERNAME: ecs.Secret.fromSecretsManager(props.dbSecret, "username"),
             DB_PASSWORD: ecs.Secret.fromSecretsManager(props.dbSecret, "password"),
             JUDGE0_AUTHN_TOKEN: ecs.Secret.fromSecretsManager(props.judge0Secret, "token"),
             AUTH_SECRET: ecs.Secret.fromSecretsManager(appSecret, "authSecret"),
+            COGNITO_CLIENT_SECRET: ecs.Secret.fromSecretsManager(props.cognitoClientSecret),
           },
         },
       }

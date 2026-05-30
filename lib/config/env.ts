@@ -37,3 +37,31 @@ export function getServerEnv(): ServerEnv {
   };
   return cached;
 }
+
+// Cognito config (feature 002). Kept separate so endpoints that don't need auth
+// (e.g. /api/ping) don't fail before Cognito is wired in.
+type CognitoEnv = {
+  COGNITO_ISSUER: string;
+  COGNITO_CLIENT_ID: string;
+  COGNITO_CLIENT_SECRET: string;
+};
+
+export function getCognitoEnv(): CognitoEnv {
+  const required: (keyof CognitoEnv)[] = [
+    "COGNITO_ISSUER",
+    "COGNITO_CLIENT_ID",
+    "COGNITO_CLIENT_SECRET",
+  ];
+  const missing = required.filter((k) => !process.env[k]);
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing Cognito environment variables: ${missing.join(", ")}. ` +
+        `These come from the Vertice-Auth CDK stack (Secrets Manager + task env).`
+    );
+  }
+  return {
+    COGNITO_ISSUER: process.env.COGNITO_ISSUER!,
+    COGNITO_CLIENT_ID: process.env.COGNITO_CLIENT_ID!,
+    COGNITO_CLIENT_SECRET: process.env.COGNITO_CLIENT_SECRET!,
+  };
+}

@@ -42,23 +42,23 @@ integrity for all mastery data). Builds on contracts/auth.md + contracts/cognito
 
 ### Infrastructure (CDK)
 
-- [ ] T005 Implement `infra/lib/auth-stack.ts`: Cognito **User Pool** (email sign-in + verification, password policy) + **User Pool App Client** (`generateSecret: true`) + **Identity Pool** federating the pool; store the client secret in Secrets Manager; output `UserPoolId`, `UserPoolClientId`, `IdentityPoolId`, `CognitoIssuerUrl`.
-- [ ] T006 Wire `Vertice-Auth` into `infra/bin/app.ts` and pass Cognito outputs to `AppStack`.
-- [ ] T007 Update `infra/lib/app-stack.ts`: inject `COGNITO_ISSUER`, `NEXT_PUBLIC_COGNITO_USER_POOL_ID`, `NEXT_PUBLIC_COGNITO_CLIENT_ID` (env) and `COGNITO_CLIENT_SECRET` + `AUTH_SECRET` (Secrets Manager) into the Fargate task definition.
+- [X] T005 Implement `infra/lib/auth-stack.ts`: Cognito **User Pool** (email sign-in + verification, password policy) + **User Pool App Client** (`generateSecret: true`) + **Identity Pool** federating the pool; store the client secret in Secrets Manager; output `UserPoolId`, `UserPoolClientId`, `IdentityPoolId`, `CognitoIssuerUrl`.
+- [X] T006 Wire `Vertice-Auth` into `infra/bin/app.ts` and pass Cognito outputs to `AppStack`.
+- [X] T007 Update `infra/lib/app-stack.ts`: inject `COGNITO_ISSUER`, `NEXT_PUBLIC_COGNITO_USER_POOL_ID`, `NEXT_PUBLIC_COGNITO_CLIENT_ID` (env) and `COGNITO_CLIENT_SECRET` + `AUTH_SECRET` (Secrets Manager) into the Fargate task definition.
 - [ ] T008 ⚠️ OPERATOR/DEPLOY: `cd infra && cdk deploy Vertice-Auth && cdk deploy Vertice-App` (creates Cognito, redeploys the task with auth env).
 
 ### Backend auth + DB sync (Next.js)
 
-- [ ] T009 Add `users.cognito_id` (unique, nullable→backfill) to `prisma/schema.prisma`; make local `email`/`password` optional; create a migration.
-- [ ] T010 Implement Auth.js (NextAuth) in `app/api/auth/[...nextauth]/route.ts` + `features/auth/auth.config.ts` with the **Cognito provider** (issuer/clientId/clientSecret from env; JWT cookie session).
-- [ ] T011 Implement `features/auth/jit-sync.ts` + `lib/db` user repository: idempotent **upsert by `cognito_id`** (create email/display_name), returning internal `userId`; called from the Auth.js sign-in/jwt callback (contracts/auth.md).
-- [ ] T012 [P] Implement `features/auth/session.ts`: server-side session helpers + route guards; attach `session.user.id` (internal) and `cognitoId`.
-- [ ] T013 Add server-side guards so `/roadmap`, `/problems/*`, `/workspace`, and `POST /api/submissions` require an authenticated session (redirect to `/login`).
+- [X] T009 Add `users.cognito_id` (unique, nullable→backfill) to `prisma/schema.prisma`; make local `email`/`password` optional; create a migration.
+- [X] T010 Implement Auth.js (NextAuth) in `app/api/auth/[...nextauth]/route.ts` + `features/auth/auth.config.ts` with the **Cognito provider** (issuer/clientId/clientSecret from env; JWT cookie session).
+- [X] T011 Implement `features/auth/jit-sync.ts` + `lib/db` user repository: idempotent **upsert by `cognito_id`** (create email/display_name), returning internal `userId`; called from the Auth.js sign-in/jwt callback (contracts/auth.md).
+- [X] T012 [P] Implement `features/auth/session.ts`: server-side session helpers + route guards; attach `session.user.id` (internal) and `cognitoId`.
+- [X] T013 Add server-side guards so `/roadmap`, `/problems/*`, `/workspace`, and `POST /api/submissions` require an authenticated session (redirect to `/login`).
 
 ### Frontend login/register
 
-- [ ] T014 Wire the existing `features/auth/Login.tsx` UI to real Auth.js sign-in; add a register flow (Cognito sign-up + email verification) in `app/(auth)/`.
-- [ ] T015 [P] Replace the mock `USER` in the header/menu with the authenticated session user; wire logout to Auth.js sign-out.
+- [X] T014 Wire the existing `features/auth/Login.tsx` UI to real Auth.js sign-in; add a register flow (Cognito sign-up + email verification) in `app/(auth)/`.
+- [X] T015 [P] Replace the mock `USER` in the header/menu with the authenticated session user; wire logout to Auth.js sign-out.
 
 **🛑 CHECKPOINT 3 — HUMAN VALIDATION**: Register a new user on the deployed ALB URL → verify the Cognito account is created, email verification works, and a `users` row with `cognito_id` appears in RDS. Stop for human sign-off before Phase 4.
 

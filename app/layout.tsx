@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
+import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: "Vértice · Plataforma adaptativa",
@@ -16,7 +17,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" className={`${GeistSans.variable} ${GeistMono.variable}`}>
-      <body className="bg-zinc-950 font-sans text-zinc-300">{children}</body>
+      <body className="bg-zinc-950 font-sans text-zinc-300">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }
