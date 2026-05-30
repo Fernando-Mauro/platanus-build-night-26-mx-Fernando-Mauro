@@ -3,6 +3,10 @@
 
 generator client {
   provider = "prisma-client-js"
+  // "native" for local dev; "debian-openssl-3.0.x" for the Node 22 bookworm
+  // container (ECS Fargate). Without the second target the deployed query engine
+  // is missing and DB calls fail at runtime.
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
