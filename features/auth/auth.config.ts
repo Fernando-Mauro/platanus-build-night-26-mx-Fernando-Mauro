@@ -8,6 +8,9 @@ import { cognitoSignIn, decodeIdToken } from "./cognito";
 import { jitSync } from "./jit-sync";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // Required behind the ALB / on localhost so Auth.js trusts the request host
+  // and actually sets the session cookie after sign-in.
+  trustHost: true,
   providers: [
     Credentials({
       credentials: {
