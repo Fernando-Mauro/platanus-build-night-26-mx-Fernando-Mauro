@@ -35,5 +35,113 @@ model User {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  masteries   ConceptMastery[]
+  submissions Submission[]
+
   @@map("users")
+}
+
+// ───────── Bayesian knowledge model (feature 002) ─────────
+
+/// A roadmap topic (e.g. Arreglos, Grafos). In this feature each topic maps 1:1
+/// to a competency for simplicity; `order` defines the linear chain.
+model Topic {
+  id        Int     @id @default(autoincrement())
+  slug      String  @unique
+  name      String
+  order     Int
+  blurb     String?
+  competencies Competency[]
+
+  @@map("topics")
+}
+
+/// A "Competencia" — the Bayesian skill node. Linear prerequisite chain via
+/// `prerequisiteId` (Arreglos → Loops/Hashing → Recursión → Árboles → Grafos).
+model Competency {
+  id             Int     @id @default(autoincrement())
+  slug           String  @unique
+  name           String
+  topicId        Int     @map("topic_id")
+  topic          Topic   @relation(fields: [topicId], references: [id])
+  prerequisiteId Int?    @map("prerequisite_id")
+  prerequisite   Competency?  @relation("Prereq", fields: [prerequisiteId], references: [id])
+  dependents     Competency[] @relation("Prereq")
+
+  problems  ProblemCompetency[]
+  masteries ConceptMastery[]
+
+  @@map("competencies")
+}
+
+model Problem {
+  id           Int     @id @default(autoincrement())
+  slug         String  @unique
+  title        String
+  difficulty   String  // "Fácil" | "Media" | "Difícil"
+  statement    String
+  starterCode  String? @map("starter_code")
+  languageId   Int     @map("language_id") // Judge0 language id (default C++)
+  testCases    Json    @map("test_cases")  // [{input, expectedOutput, hidden}]
+  competencies ProblemCompetency[]
+  submissions  Submission[]
+
+  @@map("problems")
+}
+
+/// Maps a problem to the competency(ies) it exercises (equal-split attribution).
+model ProblemCompetency {
+  problemId    Int @map("problem_id")
+  competencyId Int @map("competency_id")
+  problem      Problem    @relation(fields: [problemId], references: [id])
+  competency   Competency @relation(fields: [competencyId], references: [id])
+
+  @@id([problemId, competencyId])
+  @@map("problem_competencies")
+}
+
+/// Per-learner per-competency mastery (0–100). Cold start = 50.
+model ConceptMastery {
+  id              Int      @id @default(autoincrement())
+  userId          Int      @map("user_id")
+  competencyId    Int      @map("competency_id")
+  pMastery        Float    @default(50) @map("p_mastery")
+  status          String   @default("AVAILABLE") // LOCKED|AVAILABLE|RECOMMENDED|MASTERED
+  lastSubmissionId Int?    @map("last_submission_id")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  user            User       @relation(fields: [userId], references: [id])
+  competency      Competency @relation(fields: [competencyId], references: [id])
+
+  @@unique([userId, competencyId])
+  @@map("concept_mastery")
+}
+
+model Submission {
+  id                Int      @id @default(autoincrement())
+  userId            Int      @map("user_id")
+  problemId         Int      @map("problem_id")
+  languageId        Int      @map("language_id")
+  sourceCode        String   @map("source_code")
+  verdict           String   @default("PENDING") // PASSED|FAILED|LIMIT_EXCEEDED|ERROR|PENDING
+  passedCount       Int      @default(0) @map("passed_count")
+  totalCount        Int      @default(0) @map("total_count")
+  runtimeMs         Int?     @map("runtime_ms")
+  attemptNumber     Int      @default(1) @map("attempt_number")
+  evidenceAppliedAt DateTime? @map("evidence_applied_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  user              User    @relation(fields: [userId], references: [id])
+  problem           Problem @relation(fields: [problemId], references: [id])
+
+  @@map("submissions")
+}
+
+/// Versioned tuning parameters for the engine (configurable, no code change).
+model ModelVersion {
+  id        Int      @id @default(autoincrement())
+  label     String
+  isActive  Boolean  @default(false) @map("is_active")
+  params    Json     // { learningRate, gateLockBelow, gateUnlockAbove, coldStart }
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("model_versions")
 }
