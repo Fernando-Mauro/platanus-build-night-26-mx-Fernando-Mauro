@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useState } from "react";
 import {
   IconArrowRight,
   IconEye,
@@ -11,66 +11,12 @@ import {
   type IconComponent,
 } from "@/lib/icons";
 
-// Vértice brand mark: a tesseract (hypercube) — an outer cube face enclosing an
-// inner cube, joined by the 4D struts. Drawn with the sky brand gradient + glow.
-// Pure SVG so it scales cleanly everywhere (header, login, favicon).
-export function BrandMark({ size = 36, title = "Vértice" }: { size?: number; title?: string }) {
-  const uid = useId();
-  const grad = `vtx-grad-${uid}`;
-  const glow = `vtx-glow-${uid}`;
+export function BrandMark({ size = 36 }: { size?: number }) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 100 100"
-      fill="none"
-      role="img"
-      aria-label={title}
-    >
-      <defs>
-        <linearGradient id={grad} x1="6" y1="6" x2="94" y2="94" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#7dd3fc" />
-          <stop offset="55%" stopColor="#38bdf8" />
-          <stop offset="100%" stopColor="#0284c7" />
-        </linearGradient>
-        <filter id={glow} x="-40%" y="-40%" width="180%" height="180%">
-          <feGaussianBlur stdDeviation="2.1" result="b" />
-          <feMerge>
-            <feMergeNode in="b" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
-      <g
-        stroke={`url(#${grad})`}
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        filter={`url(#${glow})`}
-      >
-        {/* 4D struts joining outer and inner cube corners */}
-        <g strokeWidth="3.6" opacity="0.5">
-          <line x1="16" y1="16" x2="39" y2="39" />
-          <line x1="84" y1="16" x2="61" y2="39" />
-          <line x1="84" y1="84" x2="61" y2="61" />
-          <line x1="16" y1="84" x2="39" y2="61" />
-        </g>
-        {/* outer cube face */}
-        <rect x="16" y="16" width="68" height="68" rx="6" strokeWidth="5.5" />
-        {/* inner cube face */}
-        <rect
-          x="39"
-          y="39"
-          width="22"
-          height="22"
-          rx="3"
-          strokeWidth="4.5"
-          fill="#38bdf8"
-          fillOpacity="0.18"
-        />
-      </g>
-      {/* center vertex highlight */}
-      <circle cx="50" cy="50" r="2.4" fill="#e0f2fe" />
-    </svg>
+    <span className="relative flex items-center justify-center" style={{ height: size, width: size }}>
+      <span className="absolute inset-0 rotate-45 rounded-[10px] bg-gradient-to-br from-sky-400 to-sky-600 shadow-lg shadow-sky-500/30" />
+      <span className="absolute inset-[7px] rotate-45 rounded-[5px] border border-sky-200/40" />
+    </span>
   );
 }
 
@@ -207,6 +153,16 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
     }
   };
 
+  const heading =
+    mode === "signin" ? "Bienvenido de vuelta" : mode === "signup" ? "Crea tu cuenta" : "Verifica tu correo";
+  const subheading =
+    mode === "signin"
+      ? "Inicia sesión para continuar tu camino de aprendizaje."
+      : mode === "signup"
+      ? "Regístrate para empezar a practicar."
+      : "Ingresa el código que enviamos a tu correo.";
+  const cta = mode === "signin" ? "Iniciar sesión" : mode === "signup" ? "Crear cuenta" : "Verificar";
+
   return (
     <div className="grid h-screen grid-cols-1 bg-zinc-950 lg:grid-cols-[1fr_1.05fr]">
       {/* Brand panel */}
@@ -254,46 +210,54 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
             <span className="text-lg font-semibold tracking-tight text-zinc-100">Vértice</span>
           </div>
 
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-100">Bienvenida de vuelta</h1>
-          <p className="mt-1.5 text-sm text-zinc-500">Inicia sesión para continuar tu camino de aprendizaje.</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-100">{heading}</h1>
+          <p className="mt-1.5 text-sm text-zinc-500">{subheading}</p>
 
-          <div className="mt-7 grid grid-cols-2 gap-3">
-            <button onClick={onAuth} className="flex items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 py-2.5 text-sm font-medium text-zinc-200 transition-colors hover:border-zinc-700 hover:bg-zinc-900">
-              <svg viewBox="0 0 24 24" width="16" height="16"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"/></svg>
-              Google
-            </button>
-            <button onClick={onAuth} className="flex items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 py-2.5 text-sm font-medium text-zinc-200 transition-colors hover:border-zinc-700 hover:bg-zinc-900">
-              <IconGithub size={16} /> GitHub
-            </button>
-          </div>
+          {error && (
+            <div className="mt-5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3.5 py-2.5 text-xs text-rose-300">{error}</div>
+          )}
+          {info && (
+            <div className="mt-5 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3.5 py-2.5 text-xs text-sky-300">{info}</div>
+          )}
 
-          <div className="my-6 flex items-center gap-3 text-xs text-zinc-600">
-            <span className="h-px flex-1 bg-zinc-800" /> o con tu correo <span className="h-px flex-1 bg-zinc-800" />
-          </div>
-
-          <form onSubmit={submit} className="space-y-3.5">
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-zinc-400">Correo electrónico</label>
-              <Field icon={IconMail} type="email" placeholder="tu@correo.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-            </div>
-            <div>
-              <div className="mb-1.5 flex items-center justify-between">
-                <label className="text-xs font-medium text-zinc-400">Contraseña</label>
-                <a href="#" onClick={(e) => e.preventDefault()} className="whitespace-nowrap text-xs text-sky-400 hover:text-sky-300">¿Olvidaste tu contraseña?</a>
+          <form onSubmit={submit} className="mt-7 space-y-3.5">
+            {mode === "confirm" ? (
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-400">Código de verificación</label>
+                <Field icon={IconMail} type="text" placeholder="123456" value={code} onChange={(e) => setCode(e.target.value)} />
               </div>
-              <Field
-                icon={IconLock2}
-                type={show ? "text" : "password"}
-                placeholder="••••••••"
-                value={pass}
-                onChange={(e) => setPass(e.target.value)}
-                trailing={
-                  <button type="button" onClick={() => setShow((s) => !s)} className="px-3 text-zinc-500 transition-colors hover:text-zinc-300">
-                    {show ? <IconEyeOff size={16} /> : <IconEye size={16} />}
-                  </button>
-                }
-              />
-            </div>
+            ) : (
+              <>
+                {mode === "signup" && (
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-zinc-400">Nombre</label>
+                    <Field icon={IconMail} type="text" placeholder="Tu nombre" value={name} onChange={(e) => setName(e.target.value)} />
+                  </div>
+                )}
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-400">Correo electrónico</label>
+                  <Field icon={IconMail} type="email" placeholder="tu@correo.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-400">Contraseña</label>
+                  <Field
+                    icon={IconLock2}
+                    type={show ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={pass}
+                    onChange={(e) => setPass(e.target.value)}
+                    trailing={
+                      <button type="button" onClick={() => setShow((s) => !s)} className="px-3 text-zinc-500 transition-colors hover:text-zinc-300">
+                        {show ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+                      </button>
+                    }
+                  />
+                  {mode === "signup" && (
+                    <p className="mt-1.5 text-[11px] text-zinc-600">Mínimo 8 caracteres, con mayúscula, minúscula y número.</p>
+                  )}
+                </div>
+              </>
+            )}
 
             <button
               type="submit"
@@ -303,21 +267,30 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
               {loading ? (
                 <>
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-sky-900/40 border-t-sky-900" />{" "}
-                  <span className="whitespace-nowrap">Entrando…</span>
+                  <span className="whitespace-nowrap">Procesando…</span>
                 </>
               ) : (
                 <>
-                  <span className="whitespace-nowrap">Iniciar sesión</span> <IconArrowRight size={16} />
+                  <span className="whitespace-nowrap">{cta}</span> <IconArrowRight size={16} />
                 </>
               )}
             </button>
           </form>
 
           <p className="mt-6 text-center text-sm text-zinc-500">
-            ¿No tienes cuenta?{" "}
-            <a href="#" onClick={(e) => { e.preventDefault(); onAuth(); }} className="font-medium text-sky-400 hover:text-sky-300">
-              Crea una gratis
-            </a>
+            {mode === "signin" ? (
+              <>¿No tienes cuenta?{" "}
+                <button onClick={() => { setMode("signup"); setError(null); setInfo(null); }} className="font-medium text-sky-400 hover:text-sky-300">
+                  Crea una gratis
+                </button>
+              </>
+            ) : (
+              <>¿Ya tienes cuenta?{" "}
+                <button onClick={() => { setMode("signin"); setError(null); setInfo(null); }} className="font-medium text-sky-400 hover:text-sky-300">
+                  Inicia sesión
+                </button>
+              </>
+            )}
           </p>
         </div>
       </div>
