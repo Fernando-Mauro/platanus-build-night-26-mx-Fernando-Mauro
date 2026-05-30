@@ -37,9 +37,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async session({ session, token }) {
       if (session.user) {
-        const internalId = (token as { internalUserId?: number }).internalUserId;
-        if (internalId !== undefined) session.user.id = internalId;
-        session.user.cognitoId = token.sub;
+        // next-auth v5 module augmentation is finicky; assign through a loose cast.
+        const u = session.user as Record<string, unknown>;
+        u.id = (token as { internalUserId?: number }).internalUserId;
+        u.cognitoId = token.sub;
       }
       return session;
     },
