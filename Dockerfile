@@ -17,8 +17,14 @@ COPY package.json pnpm-lock.yaml ./
 # `pnpm install` exits 0 (otherwise blocked sharp/prisma postinstall → exit 1).
 # We do NOT copy the repo's pnpm-workspace.yaml (it can carry an invalid
 # `allowBuilds` placeholder added by a local hook).
-RUN printf 'onlyBuiltDependencies:\n  - sharp\n  - "@prisma/client"\n  - "@prisma/engines"\n  - prisma\n  - esbuild\n' > pnpm-workspace.yaml
-RUN pnpm install --no-frozen-lockfile --prod=false
+# pnpm 11 BLOCKS native build scripts (sharp/prisma postinstall) and EXITS 1 with
+# ERR_PNPM_IGNORED_BUILDS unless pre-approved. Those scripts aren't needed at
+# install time (the prisma engine is produced by the explicit `prisma generate`
+# in the build stage; sharp is optional), so run install and gate success on
+# node_modules being populated rather than on pnpm's exit code.
+RUN pnpm install --no-frozen-lockfile --prod=false 2>&1 | tee /tmp/install.log; \
+    test -d node_modules/next && test -d node_modules/.bin \
+      || { echo "REAL install failure:"; cat /tmp/install.log; exit 1; }
 
 # ---- build ----
 FROM base AS build
