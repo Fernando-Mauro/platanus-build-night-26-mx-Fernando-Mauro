@@ -60,9 +60,11 @@ export class Judge0Stack extends cdk.Stack {
       vpc: props.vpc,
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       securityGroup: props.judge0Sg,
+      // Free-Tier-restricted account: only t3.micro/t3.small (x86) are eligible.
+      // Spec preferred t3.medium; using t3.small (2 vCPU / 2 GB) to fit Free Tier.
       instanceType: ec2.InstanceType.of(
         ec2.InstanceClass.BURSTABLE3,
-        ec2.InstanceSize.MEDIUM
+        ec2.InstanceSize.SMALL
       ),
       machineImage: ec2.MachineImage.fromSsmParameter(
         "/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id",
