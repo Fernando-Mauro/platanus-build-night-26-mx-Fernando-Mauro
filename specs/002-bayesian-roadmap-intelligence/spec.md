@@ -19,6 +19,16 @@ what the roadmap recommends, and dropping below a mastery threshold should gate 
 steer the learner to prerequisite reinforcement. It also defines a fixed seed set of 10 foundational
 problems so the demo is deterministic and self-contained.
 
+## Clarifications
+
+### Session 2026-05-29
+
+- Q: ¿Cuáles son las competencias/temas del seed y su grafo de prerequisitos? → A: Cadena lineal de 5 competencias — Arreglos → Loops/Hashing → Recursión → Árboles → Grafos, con ~2 problemas por competencia (10 en total).
+- Q: ¿Magnitud del learning rate (efecto de un fallo y de un acierto)? → A: Suave-agresivo — un fallo baja ~15 puntos y un acierto sube ~15 puntos de maestría (por competencia, antes del reparto multi-competencia). 2 fallos = −30 pts (cumple SC-002).
+- Q: ¿Cómo se reparte el efecto de un veredicto entre las competencias de un problema multi-competencia? → A: Reparto igual — el delta total se divide entre el número de competencias del problema (p. ej. −15 en un problema de 2 competencias = −7.5 a cada una).
+- Q: ¿Tamaño del margen de estabilidad alrededor del umbral del 40%? → A: Histéresis de ±5 pts — se bloquea al caer por debajo de 40% y solo se re-desbloquea al superar 45%.
+- Q: ¿Maestría inicial (cold start) de cada competencia para un alumno nuevo? → A: 50% neutral (prior de incertidumbre bayesiano) para todas las competencias.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Mastery updates immediately after each verdict (Priority: P1)
@@ -109,9 +119,10 @@ prerequisite topic.
 - **Conflicting evidence**: A fast-but-wrong vs slow-but-correct sequence resolves to a coherent
   mastery value rather than oscillating wildly.
 - **Threshold flapping**: A learner hovering right at 40% does not flip a topic between
-  locked/unlocked on every single submission (a stability margin applies).
-- **First attempt / cold start**: A learner with no history has a defined initial mastery for each
-  competency so the roadmap is never empty or undefined.
+  locked/unlocked on every single submission — a ±5-point hysteresis band applies (lock <40%,
+  unlock >45%).
+- **First attempt / cold start**: A learner with no history starts at 50% mastery for every
+  competency (neutral prior) so the roadmap is never empty or undefined.
 - **Multi-competency attribution**: When a problem maps to several competencies, a single verdict's
   effect is shared across them rather than applied at full strength to each independently.
 - **Evaluation error (not a real verdict)**: If evaluation fails to produce a real pass/fail verdict
@@ -134,11 +145,15 @@ prerequisite topic.
   verdict for each linked competency.
 - **FR-005**: System MUST apply each verdict to mastery at most once per submission (idempotent
   update), so retries or duplicate processing do not double-count.
-- **FR-006**: System MUST use a configurable "learning rate" (update strength) parameter, set to an
-  aggressive value for the demo such that 1–2 failures in a competency produce a large, visible drop
-  in its estimated mastery.
+- **FR-006**: System MUST use a configurable "learning rate" (update strength) parameter, set for the
+  demo so a failing verdict lowers a competency's estimated mastery by ~15 percentage points and a
+  passing verdict raises it by ~15 points (per competency, before multi-competency sharing per FR-007).
+  This is aggressive enough that 1–2 failures produce a large, visible drop while keeping symmetric,
+  visible recovery. The value remains configurable for non-demo use.
 - **FR-007**: When a problem maps to multiple competencies, the system MUST distribute a single
-  verdict's effect across those competencies rather than applying full strength to each independently.
+  verdict's effect **equally** across those competencies — the total delta divided by the number of
+  linked competencies (e.g. a −15 failure on a 2-competency problem applies −7.5 to each) — rather
+  than applying full strength to each independently.
 - **FR-008**: System MUST derive each topic's mastery from its competencies' estimates so the roadmap
   can reason at the topic level.
 - **FR-009**: When a topic's estimated mastery falls below 40%, the system MUST lock the next
@@ -147,25 +162,32 @@ prerequisite topic.
   reinforcement problem drawn from a prerequisite topic; if no prerequisite exists, it MUST recommend
   an easier problem within the same topic.
 - **FR-011**: System MUST re-enable a previously locked advanced topic once the gating topic's
-  estimated mastery returns to or above the 40% threshold.
-- **FR-012**: System MUST apply a stability margin around the 40% threshold so a learner hovering at
-  the boundary does not flip a topic between locked and unlocked on every single submission.
+  estimated mastery rises **above 45%** (the upper hysteresis bound), not merely back to 40%.
+- **FR-012**: System MUST apply a **±5-point hysteresis band** around the 40% threshold: a topic
+  locks when its estimated mastery drops **below 40%** and only re-unlocks when it rises **above 45%**,
+  so a learner hovering at the boundary does not flip a topic between locked and unlocked on every
+  single submission.
 - **FR-013**: System MUST keep estimated mastery within the 0–100% bounds under any sequence of
   verdicts.
 - **FR-014**: System MUST NOT update mastery when evaluation does not yield a real pass/fail verdict
   (e.g. an evaluation/system error).
-- **FR-015**: System MUST assign every learner a defined initial mastery for each competency so a
-  brand-new learner has a complete, navigable roadmap.
+- **FR-015**: System MUST assign every learner an initial estimated mastery of **50%** for each
+  competency (a neutral Bayesian uncertainty prior) so a brand-new learner has a complete, navigable
+  roadmap. From 50%, a single failure (−15) drops a competency to 35% (below the 40% gate), enabling
+  the demo's gating scenario.
 - **FR-016**: System MUST provide a fixed seed set of exactly 10 foundational problems, pre-loaded
   for the demo, each linked to its competency(ies), with deterministic content so the demo is
-  repeatable.
+  repeatable. The seed uses a **linear chain of 5 competencies** — Arreglos → Loops/Hashing →
+  Recursión → Árboles → Grafos (each later one depends on the previous) — with **~2 problems per
+  competency** (10 total).
 - **FR-017**: System MUST make the mastery change traceable to the submission that caused it (so the
   demo can show "this failure caused this change").
 
 ### Key Entities *(include if feature involves data)*
 
-- **Competency ("Competencia")**: A first-class knowledge unit (e.g. Recursión, Arreglos, Loops). A
-  problem links to one or more competencies; mastery is tracked per competency.
+- **Competency ("Competencia")**: A first-class knowledge unit. The demo seed defines exactly 5 in a
+  linear prerequisite chain: Arreglos → Loops/Hashing → Recursión → Árboles → Grafos. A problem links
+  to one or more competencies; mastery is tracked per competency.
 - **Topic**: A roadmap-level grouping of competencies with prerequisite relationships to other
   topics; its mastery is derived from its competencies. Drives locking/recommendation.
 - **Problem**: A coding exercise linked to one or more competencies; the source of verdicts that
@@ -185,8 +207,9 @@ prerequisite topic.
 
 - **SC-001**: After any submission that yields a verdict, the affected competency's estimated mastery
   reflects that verdict on the next roadmap view (no stale state beyond a normal page load).
-- **SC-002**: From a mid-range starting point, 2 consecutive failures in a competency reduce its
-  estimated mastery by at least 30 percentage points (demonstrating the aggressive learning rate).
+- **SC-002**: From the 50% starting point, 2 consecutive failures in a single-competency problem
+  reduce that competency's estimated mastery to ~20% (a ~30-point drop: 50→35→20), demonstrating the
+  aggressive learning rate and crossing the 40% gate after the first failure.
 - **SC-003**: When a topic's mastery drops below 40%, the dependent advanced topic appears locked and
   a prerequisite reinforcement problem is recommended, observable within one roadmap refresh.
 - **SC-004**: Raising a gating topic's mastery back to/above 40% re-enables the previously locked
