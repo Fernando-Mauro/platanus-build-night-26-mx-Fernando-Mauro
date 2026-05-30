@@ -1,7 +1,7 @@
 # T018 — Multi-stage production image for the Next.js app (standalone output).
 # Debian-slim base so the native Prisma engine works without extra binaryTargets.
 
-FROM node:20-bookworm-slim AS base
+FROM node:22-bookworm-slim AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 RUN corepack enable
@@ -26,7 +26,7 @@ RUN pnpm exec prisma generate
 RUN pnpm exec next build
 
 # ---- runtime ----
-FROM node:20-bookworm-slim AS runner
+FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000

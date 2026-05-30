@@ -3,12 +3,12 @@ import { Construct } from "constructs";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 
 /**
- * T014 — VPC + security groups.
+ * T014 - VPC + security groups.
  * Two AZs, public subnets (ALB + NAT) and private-with-egress subnets (Fargate,
  * RDS, Judge0). RDS and Judge0 get empty-ingress SGs here; the rule allowing the
  * Fargate service is declared in the App stack (as CfnSecurityGroupIngress) so
  * the cross-stack dependency stays one-directional (App→Network) and avoids a
- * cyclic reference (Constitution Principle III — isolation, no public ingress).
+ * cyclic reference (Constitution Principle III - isolation, no public ingress).
  */
 export class NetworkStack extends cdk.Stack {
   public readonly vpc: ec2.Vpc;
@@ -30,14 +30,14 @@ export class NetworkStack extends cdk.Stack {
     // RDS: ingress 5432 added later from the App stack (Fargate service SG only).
     this.rdsSg = new ec2.SecurityGroup(this, "RdsSg", {
       vpc: this.vpc,
-      description: "RDS PostgreSQL — Fargate service only",
+      description: "RDS PostgreSQL - Fargate service only",
       allowAllOutbound: true,
     });
 
     // Judge0 EC2: ingress 2358 added later from the App stack.
     this.judge0Sg = new ec2.SecurityGroup(this, "Judge0Sg", {
       vpc: this.vpc,
-      description: "Judge0 EC2 — Fargate service only",
+      description: "Judge0 EC2 - Fargate service only",
       allowAllOutbound: true,
     });
   }

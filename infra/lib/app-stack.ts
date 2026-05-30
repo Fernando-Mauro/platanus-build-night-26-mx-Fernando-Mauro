@@ -18,14 +18,14 @@ interface AppStackProps extends cdk.StackProps {
 }
 
 /**
- * T019 — Next.js container on ECS Fargate behind an internet-facing ALB.
+ * T019 - Next.js container on ECS Fargate behind an internet-facing ALB.
  * Tasks run in private subnets; the image is built from the repo Dockerfile and
  * pushed to an auto-managed ECR repo at deploy time. All secrets are injected
  * from Secrets Manager (Principle II); the task role reads only the app secrets.
  *
  * The ALB Fargate pattern creates its own service SG (ALB↔task path lives wholly
  * in this stack). RDS/Judge0 ingress from that SG is declared here as explicit
- * CfnSecurityGroupIngress on the imported SG ids — a one-way App→Network ref,
+ * CfnSecurityGroupIngress on the imported SG ids - a one-way App→Network ref,
  * which is what avoids the cyclic stack dependency.
  */
 export class AppStack extends cdk.Stack {
@@ -110,7 +110,7 @@ export class AppStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, "AlbUrl", {
       value: `http://${service.loadBalancer.loadBalancerDnsName}`,
-      description: "Public ALB URL — open /api/ping to validate the skeleton",
+      description: "Public ALB URL - open /api/ping to validate the skeleton",
     });
   }
 }
