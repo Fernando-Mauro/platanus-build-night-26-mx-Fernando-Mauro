@@ -37,9 +37,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async session({ session, token }) {
       if (session.user) {
-        // next-auth v5 module augmentation is finicky; assign through a loose cast.
-        const u = session.user as Record<string, unknown>;
-        u.id = (token as { internalUserId?: number }).internalUserId;
+        // Attach our extra fields via a loose cast (no Session augmentation).
+        const u = session.user as unknown as Record<string, unknown>;
+        u.internalId = (token as { internalUserId?: number }).internalUserId;
         u.cognitoId = token.sub;
       }
       return session;

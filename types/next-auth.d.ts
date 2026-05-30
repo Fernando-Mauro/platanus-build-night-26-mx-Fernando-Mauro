@@ -1,17 +1,8 @@
-// Augment Auth.js types with our internal user id + cognito id (feature 002).
-import "next-auth";
-
-declare module "next-auth" {
-  interface Session {
-    user: {
-      id?: number;
-      cognitoId?: string;
-      name?: string | null;
-      email?: string | null;
-      image?: string | null;
-    };
-  }
-}
+// Augment only the JWT with our internal RDS user id (feature 002).
+// We deliberately do NOT augment Session.user (next-auth v5 interface merging is
+// fragile and collides with the default `id: string`). Session consumers read our
+// extra fields via the SessionUser helper type in features/auth/types.ts.
+import "next-auth/jwt";
 
 declare module "next-auth/jwt" {
   interface JWT {
