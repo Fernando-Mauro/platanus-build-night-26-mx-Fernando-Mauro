@@ -16,7 +16,7 @@ const TOPICS = [
 // 2 problems per competency (10 total). C++ = Judge0 language id 54.
 const CPP = 54;
 const tc = (input: string, expectedOutput: string, hidden = false) => ({ input, expectedOutput, hidden });
-const PROBLEMS = [
+const PROBLEMS: { slug: string; title: string; difficulty: string; comp: string }[] = [
   { slug: "two-sum",         title: "Two Sum",                 difficulty: "Fácil",  comp: "arreglos" },
   { slug: "max-subarray",    title: "Subarreglo Máximo",       difficulty: "Media",  comp: "arreglos" },
   { slug: "two-sum-hash",    title: "Two Sum (Hashing)",       difficulty: "Fácil",  comp: "hashing" },
